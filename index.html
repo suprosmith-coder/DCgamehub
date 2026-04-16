@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Game Hub · Discord Activity</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+<!-- Supabase for real-time multiplayer -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+/* ═══════════════════════════════
+   VARIABLES & RESET
+═══════════════════════════════ */
+:root {
+  --bg:         #0d0e1c;
+  --surface:    #161829;
+  --card-bg:    #1e2040;
+  --border:     rgba(255,255,255,0.08);
+  --accent:     #5865F2;
+  --accent2:    #a5b4fc;
+  --uno-red:    #e8302c;
+  --uno-blue:   #1a73e8;
+  --uno-yellow: #f9c023;
+  --uno-green:  #2db552;
+  --tod-purple: #7c3aed;
+  --tod-pink:   #ec4899;
+  --text:       #e2e4f0;
+  --muted:      #6b7280;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:var(--bg);
+  font-family:'Nunito',sans-serif;
+  color:var(--text);
+  min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;
+  overflow-x:hidden;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%,rgba(88,101,242,.13) 0%,transparent 70%),
+    radial-gradient(circle at 15% 85%,rgba(124,58,237,.07) 0%,transparent 40%),
+    radial-gradient(circle at 85% 15%,rgba(236,72,153,.05) 0%,transparent 40%);
+}
+
+/* ═══════════════════════════════
+   SCREEN MANAGER
+═══════════════════════════════ */
+.screen{display:none;width:100%;min-height:100vh;}
+.screen.active{display:flex;flex-direction:column;align-items:center;}
+
+/* ═══════════════════════════════
+   LAUNCHER
+═══════════════════════════════ */
+#screen-launcher{justify-content:center;padding:40px 20px;gap:32px;}
+.launcher-header{text-align:center;animation:fadeDown .6s ease both;}
+.discord-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(88,101,242,.18);border:1px solid rgba(88,101,242,.35);
+  border-radius:20px;padding:6px 16px;font-size:11px;font-weight:800;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);margin-bottom:14px;
+}
+.discord-badge svg{width:15px;height:15px;}
+.launcher-header h1{
+  font-family:'Fredoka One',cursive;font-size:clamp(2rem,5vw,3.5rem);
+  background:linear-gradient(135deg,#a5b4fc,#818cf8,#c084fc);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  line-height:1.1;margin-bottom:6px;
+}
+.launcher-header p{color:var(--muted);font-size:14px;font-weight:700;}
+.activity-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:18px;width:100%;max-width:720px;animation:fadeUp .7s .2s ease both;
+}
+.activity-card{
+  position:relative;border-radius:20px;padding:26px;cursor:pointer;
+  transition:transform .2s,box-shadow .2s;overflow:hidden;border:1px solid transparent;
+}
+.activity-card:hover{transform:translateY(-4px);}
+.activity-card.uno-card{
+  background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);
+  border-color:rgba(232,48,44,.3);box-shadow:0 8px 32px rgba(232,48,44,.2);
+}
+.activity-card.uno-card:hover{box-shadow:0 16px 48px rgba(232,48,44,.35);border-color:rgba(232,48,44,.6);}
+.activity-card.tod-card{
+  background:linear-gradient(135deg,#1a0a2e,#2d1b6e,#1a0a2e);
+  border-color:rgba(124,58,237,.3);box-shadow:0 8px 32px rgba(124,58,237,.2);
+}
+.activity-card.tod-card:hover{box-shadow:0 16px 48px rgba(124,58,237,.35);border-color:rgba(124,58,237,.6);}
+.card-glow{
+  position:absolute;width:200px;height:200px;border-radius:50%;
+  top:-60px;right:-60px;filter:blur(60px);opacity:.35;pointer-events:none;
+}
+.uno-card .card-glow{background:var(--uno-red);}
+.tod-card .card-glow{background:var(--tod-purple);}
+.card-icon{font-size:50px;margin-bottom:12px;display:block;filter:drop-shadow(0 4px 12px rgba(0,0,0,.5));}
+.card-label{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px;}
+.uno-card .card-label{color:var(--uno-red);}
+.tod-card .card-label{color:#a78bfa;}
+.card-title{font-family:'Fredoka One',cursive;font-size:26px;color:#fff;margin-bottom:6px;}
+.card-desc{font-size:12px;color:#9ca3af;line-height:1.5;margin-bottom:16px;font-weight:600;}
+.card-meta{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+.meta-pill{
+  background:rgba(255,255,255,.07);border-radius:20px;
+  padding:4px 11px;font-size:11px;font-weight:700;color:#d1d5db;
+}
+.launch-btn{
+  display:inline-flex;align-items:center;gap:8px;padding:11px 22px;
+  border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;
+  border:none;cursor:pointer;transition:all .2s;text-transform:uppercase;letter-spacing:.05em;
+}
+.uno-card .launch-btn{background:linear-gradient(135deg,var(--uno-red),#c0392b);color:#fff;box-shadow:0 4px 16px rgba(232,48,44,.4);}
+.uno-card .launch-btn:hover{box-shadow:0 6px 24px rgba(232,48,44,.6);transform:scale(1.02);}
+.tod-card .launch-btn{background:linear-gradient(135deg,var(--tod-purple),#6d28d9);color:#fff;box-shadow:0 4px 16px rgba(124,58,237,.4);}
+.tod-card .launch-btn:hover{box-shadow:0 6px 24px rgba(124,58,237,.6);transform:scale(1.02);}
+
+/* ═══════════════════════════════
+   LOBBY SCREEN
+═══════════════════════════════ */
+#screen-lobby{justify-content:center;padding:32px 20px;gap:20px;background:var(--bg);}
+.lobby-header{text-align:center;animation:fadeDown .5s ease both;}
+.lobby-header h2{font-family:'Fredoka One',cursive;font-size:2rem;color:#fff;margin-bottom:4px;}
+.lobby-header p{color:var(--muted);font-size:13px;font-weight:700;}
+.lobby-box{
+  background:rgba(255,255,255,.04);border:1px solid var(--border);
+  border-radius:20px;padding:24px;width:100%;max-width:420px;
+  animation:fadeUp .5s .1s ease both;
+}
+.lobby-box h3{font-family:'Fredoka One',cursive;font-size:17px;color:#fff;margin-bottom:14px;}
+.field-label{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.inp{
+  width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;padding:11px 14px;color:#fff;
+  font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;outline:none;
+  transition:border-color .2s;
+}
+.inp:focus{border-color:var(--accent);}
+.inp::placeholder{color:rgba(255,255,255,.25);}
+.inp.code-inp{
+  letter-spacing:.4em;font-size:22px;text-align:center;
+  font-family:'Fredoka One',cursive;text-transform:uppercase;
+}
+.btn-row{display:flex;gap:10px;margin-top:6px;}
+.btn{
+  flex:1;padding:11px 16px;border-radius:10px;border:none;
+  font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;
+  cursor:pointer;transition:all .2s;letter-spacing:.04em;
+}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#4752c4);color:#fff;box-shadow:0 4px 14px rgba(88,101,242,.4);}
+.btn-primary:hover{box-shadow:0 6px 20px rgba(88,101,242,.55);transform:scale(1.02);}
+.btn-secondary{background:rgba(255,255,255,.08);color:#d1d5db;border:1px solid var(--border);}
+.btn-secondary:hover{background:rgba(255,255,255,.13);}
+.btn-danger{background:linear-gradient(135deg,var(--uno-red),#c0221e);color:#fff;box-shadow:0 4px 14px rgba(232,48,44,.35);}
+.btn-danger:hover{box-shadow:0 6px 20px rgba(232,48,44,.5);transform:scale(1.02);}
+.btn-success{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 4px 14px rgba(34,197,94,.4);}
+.btn-success:hover{box-shadow:0 6px 20px rgba(34,197,94,.5);transform:scale(1.02);}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important;}
+.room-code-display{
+  background:rgba(88,101,242,.12);border:2px solid rgba(88,101,242,.3);
+  border-radius:14px;padding:16px;margin:12px 0;text-align:center;
+}
+.room-code-display .code-big{
+  font-family:'Fredoka One',cursive;font-size:42px;letter-spacing:.35em;
+  color:#fff;text-shadow:0 0 30px rgba(88,101,242,.8);
+}
+.room-code-display p{font-size:11px;color:var(--muted);font-weight:700;margin-top:4px;}
+.lobby-players{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+.lobby-player-item{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,.05);border-radius:10px;padding:9px 12px;
+  animation:fadeIn .3s ease both;
+}
+.lp-avatar{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:900;color:#fff;flex-shrink:0;
+}
+.lp-name{font-size:13px;font-weight:800;flex:1;}
+.lp-badge{
+  font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 8px;border-radius:8px;
+}
+.lp-badge.host{background:rgba(249,192,35,.2);color:var(--uno-yellow);}
+.lp-badge.you{background:rgba(88,101,242,.2);color:var(--accent2);}
+.lobby-divider{
+  display:flex;align-items:center;gap:10px;color:var(--muted);
+  font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin:6px 0;
+}
+.lobby-divider::before,.lobby-divider::after{
+  content:'';flex:1;height:1px;background:var(--border);
+}
+
+/* ═══════════════════════════════
+   GAME TOP BAR (shared)
+═══════════════════════════════ */
+.game-topbar{
+  width:100%;background:rgba(0,0,0,.45);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);padding:11px 18px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.back-btn{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);
+  color:#d1d5db;padding:6px 13px;border-radius:8px;font-size:12px;font-weight:800;
+  cursor:pointer;font-family:'Nunito',sans-serif;transition:all .2s;
+}
+.back-btn:hover{background:rgba(255,255,255,.15);}
+.topbar-title{font-family:'Fredoka One',cursive;font-size:19px;color:#fff;display:flex;align-items:center;gap:7px;}
+.topbar-meta{font-size:11px;color:var(--muted);font-weight:700;}
+
+/* ═══════════════════════════════
+   UNO GAME SCREEN
+═══════════════════════════════ */
+#screen-uno{padding:0;background:#0d0f1a;min-height:100vh;position:relative;overflow:hidden;}
+#screen-uno::before{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 60% 40% at 50% 50%,rgba(232,48,44,.07) 0%,transparent 70%);
+}
+.uno-table{
+  width:100%;max-width:900px;margin:0 auto;
+  padding:18px 16px 130px;display:flex;flex-direction:column;align-items:center;gap:18px;
+}
+
+/* ── Players row ── */
+.players-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%;animation:fadeDown .4s ease both;}
+.player-chip{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border);
+  border-radius:14px;padding:11px 14px;min-width:82px;transition:all .25s;position:relative;
+}
+.player-chip.active-player{
+  border-color:var(--uno-yellow);background:rgba(249,192,35,.09);
+  box-shadow:0 0 20px rgba(249,192,35,.22);
+}
+.player-chip.active-player::before{
+  content:'YOUR TURN';position:absolute;top:-9px;
+  background:var(--uno-yellow);color:#111;font-size:7px;font-weight:900;
+  letter-spacing:.1em;padding:2px 7px;border-radius:8px;
+}
+.player-chip.other-active-player{
+  border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.07);
+  box-shadow:0 0 16px rgba(255,255,255,.12);
+}
+.player-chip.other-active-player::before{
+  content:'THEIR TURN';position:absolute;top:-9px;
+  background:rgba(255,255,255,.8);color:#111;font-size:7px;font-weight:900;
+  letter-spacing:.1em;padding:2px 7px;border-radius:8px;
+}
+.player-avatar{
+  width:38px;height:38px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:17px;font-weight:900;
+  color:#fff;position:relative;
+}
+.card-count-badge{
+  position:absolute;bottom:-3px;right:-3px;background:#ef4444;
+  color:#fff;font-size:9px;font-weight:900;width:17px;height:17px;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:2px solid #0d0f1a;
+}
+.player-name{font-size:11px;font-weight:800;color:#d1d5db;text-align:center;}
+.player-score{font-size:10px;color:var(--muted);font-weight:700;}
+
+/* ── Game arena ── */
+.game-arena{
+  position:relative;width:240px;height:240px;
+  display:flex;align-items:center;justify-content:center;
+  animation:fadeIn .5s .2s ease both;
+}
+.arena-ring{position:absolute;inset:0;border-radius:50%;border:2px dashed rgba(255,255,255,.07);animation:spin 20s linear infinite;}
+.arena-ring-2{position:absolute;inset:20px;border-radius:50%;border:1px dashed rgba(88,101,242,.18);animation:spin 12s linear infinite reverse;}
+.turn-arrows{position:absolute;inset:-10px;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:spin 8s linear infinite;opacity:.55;}
+.discard-pile{position:relative;z-index:10;}
+.draw-pile-btn{
+  position:absolute;right:-72px;top:50%;transform:translateY(-50%);
+  cursor:pointer;transition:transform .2s;
+}
+.draw-pile-btn:hover{transform:translateY(-50%) scale(1.06);}
+.draw-pile-inner{text-align:center;}
+.draw-pile-label{font-size:10px;color:var(--muted);font-weight:800;margin-top:4px;letter-spacing:.05em;}
+
+/* ── Card image styles ── */
+.card-img-wrap{
+  position:relative;flex-shrink:0;
+  transition:transform .15s ease,filter .15s ease;
+  border-radius:10px;
+}
+.card-img-wrap img{
+  display:block;border-radius:10px;object-fit:cover;
+  box-shadow:0 4px 14px rgba(0,0,0,.5);
+  user-select:none;-webkit-user-drag:none;pointer-events:none;
+}
+.card-img-wrap.clickable{cursor:pointer;}
+.card-img-wrap.clickable:hover{transform:translateY(-10px) scale(1.05);}
+.card-img-wrap.selected{
+  transform:translateY(-20px) scale(1.1)!important;
+  filter:drop-shadow(0 0 10px rgba(255,255,255,.5));
+}
+.card-img-wrap.selected img{box-shadow:0 14px 36px rgba(0,0,0,.6),0 0 0 3px rgba(255,255,255,.6);}
+.card-img-wrap.playable img{box-shadow:0 4px 14px rgba(0,0,0,.5),0 0 0 2px rgba(255,255,255,.4);}
+/* CSS fallback card (when PNG not found or for backs) */
+.card-css{
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 14px rgba(0,0,0,.5);font-family:'Fredoka One',cursive;
+  color:#fff;font-size:24px;border:2px solid rgba(255,255,255,.15);
+}
+.card-css.card-red{background:linear-gradient(145deg,#e8302c,#c0221e);}
+.card-css.card-blue{background:linear-gradient(145deg,#1a73e8,#1557b0);}
+.card-css.card-green{background:linear-gradient(145deg,#2db552,#1e8a3d);}
+.card-css.card-yellow{background:linear-gradient(145deg,#f9c023,#e0a010);}
+.card-css.card-black{background:linear-gradient(145deg,#222,#000);}
+.card-back-css{
+  background:linear-gradient(145deg,#c0221e,#e8302c);
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 14px rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.15);flex-shrink:0;
+}
+.card-back-logo{
+  font-family:'Fredoka One',cursive;font-size:14px;color:rgba(255,255,255,.9);
+  background:rgba(0,0,0,.3);border-radius:50%;
+  width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+  transform:rotate(-15deg);letter-spacing:.02em;
+}
+
+/* ── Your hand (fixed bottom) ── */
+.your-hand{
+  position:fixed;bottom:0;left:0;right:0;
+  padding:14px 14px 18px;
+  background:linear-gradient(to top,rgba(13,15,26,1) 65%,transparent);
+  display:flex;flex-direction:column;align-items:center;gap:10px;z-index:50;
+}
+.hand-label{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.2);}
+.hand-cards{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;max-height:120px;overflow:visible;}
+.action-bar{display:flex;gap:8px;align-items:center;}
+.play-btn{
+  background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;
+  padding:10px 22px;border-radius:10px;font-family:'Nunito',sans-serif;
+  font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;
+  box-shadow:0 4px 16px rgba(34,197,94,.4);
+}
+.play-btn:hover{transform:scale(1.05);box-shadow:0 6px 20px rgba(34,197,94,.5);}
+.play-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+.uno-shout-btn{
+  background:linear-gradient(135deg,var(--uno-red),#c0221e);color:#fff;border:none;
+  padding:10px 18px;border-radius:10px;font-family:'Fredoka One',cursive;
+  font-size:15px;cursor:pointer;transition:all .2s;
+  box-shadow:0 4px 16px rgba(232,48,44,.4);letter-spacing:.05em;
+}
+.uno-shout-btn:hover{transform:scale(1.08);box-shadow:0 6px 24px rgba(232,48,44,.6);}
+.turn-indicator{
+  font-size:11px;font-weight:800;color:rgba(255,255,255,.3);
+  letter-spacing:.08em;text-transform:uppercase;
+}
+.turn-indicator.is-your-turn{color:var(--uno-yellow);}
+
+/* ── Game log ── */
+.game-log{
+  width:100%;max-width:420px;background:rgba(0,0,0,.25);
+  border:1px solid var(--border);border-radius:12px;padding:11px;
+  font-size:12px;color:var(--muted);animation:fadeIn .5s .3s ease both;
+}
+.log-entry{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.log-entry:last-child{border-bottom:none;color:#9ca3af;}
+.log-you{color:#60a5fa;}
+.log-warn{color:var(--uno-yellow);}
+.log-system{color:#a78bfa;}
+
+/* ── Color indicator dot ── */
+.active-color-dot{
+  width:14px;height:14px;border-radius:50%;display:inline-block;
+  border:2px solid rgba(255,255,255,.3);margin-right:4px;vertical-align:middle;
+  box-shadow:0 0 8px currentColor;
+}
+
+/* ═══════════════════════════════
+   TRUTH OR DARE SCREEN
+═══════════════════════════════ */
+#screen-tod{padding:0;background:#0e0818;position:relative;overflow:hidden;}
+#screen-tod::before{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 50% at 30% 40%,rgba(124,58,237,.11) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 40% at 70% 60%,rgba(236,72,153,.07) 0%,transparent 50%);
+}
+.tod-arena{width:100%;max-width:680px;margin:0 auto;padding:18px 16px 40px;display:flex;flex-direction:column;align-items:center;gap:22px;}
+.tod-players{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%;animation:fadeDown .4s ease both;}
+.tod-player-chip{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border);
+  border-radius:12px;padding:10px 13px;min-width:78px;position:relative;transition:all .3s;
+}
+.tod-player-chip.spotlight{
+  border-color:var(--tod-pink);background:rgba(236,72,153,.1);
+  box-shadow:0 0 24px rgba(236,72,153,.3);transform:scale(1.05);
+}
+.tod-player-chip.spotlight::before{content:'🎯';position:absolute;top:-13px;font-size:15px;animation:bounce 1s ease infinite;}
+.tod-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#fff;}
+.tod-pname{font-size:11px;font-weight:800;color:#d1d5db;text-align:center;}
+.tod-pscore{font-size:9px;color:var(--muted);font-weight:700;}
+.tod-wheel-area{display:flex;flex-direction:column;align-items:center;gap:18px;animation:fadeIn .5s .2s ease both;}
+.wheel-ring{
+  width:190px;height:190px;border-radius:50%;
+  background:conic-gradient(#7c3aed 0deg 180deg,#ec4899 180deg 360deg);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 40px rgba(124,58,237,.4),0 0 80px rgba(236,72,153,.2);
+  cursor:pointer;transition:transform .2s;position:relative;
+}
+.wheel-ring:hover{transform:scale(1.04);}
+.wheel-ring.spinning{animation:wheelSpin .8s ease both;}
+.wheel-inner{
+  width:112px;height:112px;border-radius:50%;background:#0e0818;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;
+}
+.wheel-inner span:first-child{font-size:26px;}
+.wheel-inner span:last-child{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9ca3af;}
+.tod-choice-btns{display:flex;gap:13px;}
+.tod-btn{padding:13px 28px;border-radius:14px;border:none;font-family:'Fredoka One',cursive;font-size:21px;cursor:pointer;transition:all .2s;letter-spacing:.02em;}
+.tod-truth-btn{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;box-shadow:0 6px 24px rgba(124,58,237,.5);}
+.tod-truth-btn:hover{transform:scale(1.06);box-shadow:0 8px 32px rgba(124,58,237,.7);}
+.tod-dare-btn{background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;box-shadow:0 6px 24px rgba(236,72,153,.5);}
+.tod-dare-btn:hover{transform:scale(1.06);box-shadow:0 8px 32px rgba(236,72,153,.7);}
+.prompt-card{width:100%;max-width:480px;border-radius:20px;padding:26px;text-align:center;position:relative;overflow:hidden;animation:cardReveal .5s cubic-bezier(.34,1.56,.64,1) both;}
+.prompt-card.truth-card{background:linear-gradient(135deg,#1e1040,#2d1b6e);border:1px solid rgba(124,58,237,.5);box-shadow:0 8px 40px rgba(124,58,237,.3);}
+.prompt-card.dare-card{background:linear-gradient(135deg,#2d0a1e,#6b1040);border:1px solid rgba(236,72,153,.5);box-shadow:0 8px 40px rgba(236,72,153,.3);}
+.prompt-type{font-size:10px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;margin-bottom:11px;}
+.truth-card .prompt-type{color:#a78bfa;}.dare-card .prompt-type{color:#f9a8d4;}
+.prompt-text{font-family:'Fredoka One',cursive;font-size:clamp(17px,4vw,23px);color:#fff;line-height:1.4;margin-bottom:18px;}
+.prompt-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+.prompt-action-btn{padding:9px 18px;border-radius:10px;border:none;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;}
+.btn-complete{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 4px 16px rgba(34,197,94,.4);}
+.btn-skip{background:rgba(255,255,255,.07);color:#9ca3af;border:1px solid var(--border);}
+.btn-complete:hover{transform:scale(1.04);}
+.btn-skip:hover{background:rgba(255,255,255,.12);}
+.ai-thinking{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;font-weight:700;padding:20px;}
+.ai-thinking-dots span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);animation:dotPulse 1.2s ease infinite;}
+.ai-thinking-dots span:nth-child(2){animation-delay:.2s;}
+.ai-thinking-dots span:nth-child(3){animation-delay:.4s;}
+
+/* ═══════════════════════════════
+   MODALS
+═══════════════════════════════ */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+  z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(8px);
+}
+.modal-overlay.show{display:flex;}
+.color-modal,.modal-box{
+  background:var(--surface);border:1px solid rgba(255,255,255,.1);
+  border-radius:20px;padding:26px;text-align:center;
+  box-shadow:0 24px 80px rgba(0,0,0,.8);animation:cardReveal .3s cubic-bezier(.34,1.56,.64,1) both;
+  max-width:340px;width:90%;
+}
+.color-modal h3,.modal-box h3{font-family:'Fredoka One',cursive;font-size:21px;color:#fff;margin-bottom:18px;}
+.color-picker-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px;}
+.color-pick-btn{
+  width:78px;height:78px;border-radius:13px;border:3px solid transparent;
+  cursor:pointer;transition:all .2s;font-size:22px;display:flex;align-items:center;justify-content:center;
+}
+.color-pick-btn:hover{transform:scale(1.1);border-color:rgba(255,255,255,.5);}
+.cpb-red{background:var(--uno-red);}
+.cpb-blue{background:var(--uno-blue);}
+.cpb-yellow{background:var(--uno-yellow);}
+.cpb-green{background:var(--uno-green);}
+
+/* Win / Game Over modal */
+.win-modal-content{animation:cardReveal .5s cubic-bezier(.34,1.56,.64,1) both;}
+.win-emoji{font-size:64px;margin-bottom:12px;display:block;}
+.win-subtitle{font-size:13px;color:var(--muted);font-weight:700;margin-bottom:20px;}
+
+/* ═══════════════════════════════
+   TOAST
+═══════════════════════════════ */
+.toast{
+  position:fixed;top:78px;left:50%;transform:translateX(-50%) translateY(-16px);
+  background:rgba(0,0,0,.88);border:1px solid rgba(255,255,255,.1);color:#fff;
+  padding:11px 22px;border-radius:12px;font-size:14px;font-weight:700;
+  z-index:300;opacity:0;transition:all .3s;pointer-events:none;
+  backdrop-filter:blur(20px);white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ═══════════════════════════════
+   ANIMATIONS
+═══════════════════════════════ */
+@keyframes fadeDown{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes dotPulse{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes cardReveal{from{opacity:0;transform:scale(.85) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes wheelSpin{0%{transform:rotate(0deg) scale(1.04)}50%{transform:rotate(180deg) scale(1.08)}100%{transform:rotate(360deg) scale(1.04)}}
+@keyframes cardPlay{0%{transform:translateY(-50px) scale(1.15) rotate(-8deg);opacity:0}100%{transform:translateY(0) scale(1) rotate(0);opacity:1}}
+@keyframes cardSlide{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+.card-play-anim{animation:cardPlay .4s cubic-bezier(.34,1.56,.64,1) both;}
+.card-slide-in{animation:cardSlide .3s ease both;}
+
+@media(max-width:480px){
+  .activity-grid{grid-template-columns:1fr;}
+  .hand-cards .card-img-wrap img{border-radius:7px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════
+     LAUNCHER
+══════════════════════════════ -->
+<div id="screen-launcher" class="screen active">
+  <div class="launcher-header">
+    <div class="discord-badge">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.053a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.075.075 0 0 0-.041-.104 13.175 13.175 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+      Discord Activity
+    </div>
+    <h1>Game Hub</h1>
+    <p>Play with friends right inside your voice channel</p>
+  </div>
+  <div class="activity-grid">
+    <div class="activity-card uno-card" onclick="openLobby('uno')">
+      <div class="card-glow"></div>
+      <span class="card-icon">🃏</span>
+      <div class="card-label">Card Game</div>
+      <div class="card-title">UNO</div>
+      <div class="card-desc">Draw, match, and shout UNO! Real-time multiplayer with your voice channel friends.</div>
+      <div class="card-meta">
+        <span class="meta-pill">👥 2–10 Players</span>
+        <span class="meta-pill">🔴 Real-time</span>
+        <span class="meta-pill">🎮 Turn Based</span>
+      </div>
+      <button class="launch-btn" onclick="event.stopPropagation();openLobby('uno')">🚀 Launch Game</button>
+    </div>
+    <div class="activity-card tod-card" onclick="openLobby('tod')">
+      <div class="card-glow"></div>
+      <span class="card-icon">🎯</span>
+      <div class="card-label">Party Game</div>
+      <div class="card-title">Truth or Dare</div>
+      <div class="card-desc">AI-powered truths and dares. Spin the wheel, face the consequences.</div>
+      <div class="card-meta">
+        <span class="meta-pill">👥 2–12 Players</span>
+        <span class="meta-pill">🤖 AI Prompts</span>
+        <span class="meta-pill">🔥 Party Mode</span>
+      </div>
+      <button class="launch-btn" onclick="event.stopPropagation();openLobby('tod')">🚀 Launch Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     LOBBY
+══════════════════════════════ -->
+<div id="screen-lobby" class="screen">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="leaveLobby()">← Back</button>
+    <div class="topbar-title" id="lobby-title">🃏 UNO Lobby</div>
+    <div class="topbar-meta" id="lobby-player-count">0 players</div>
+  </div>
+
+  <div style="width:100%;max-width:480px;padding:20px 16px;display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Name input (hidden once locked in) -->
+    <div class="lobby-box" id="lobby-name-box">
+      <h3>Who are you?</h3>
+      <div class="field-label">Your Display Name</div>
+      <input id="inp-name" class="inp" type="text" maxlength="18" placeholder="Enter your name…" oninput="onNameInput()">
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-primary" id="btn-confirm-name" onclick="confirmName()" disabled>Continue →</button>
+      </div>
+    </div>
+
+    <!-- Room options (shown after name confirmed) -->
+    <div class="lobby-box" id="lobby-room-box" style="display:none;">
+      <div style="display:flex;gap:10px;flex-direction:column;">
+
+        <!-- Create -->
+        <button class="btn btn-danger" onclick="createRoom()" id="btn-create">🎲 Create Room</button>
+
+        <div class="lobby-divider">or join existing</div>
+
+        <div class="field-label">Room Code</div>
+        <input id="inp-room-code" class="inp code-inp" type="text" maxlength="6" placeholder="A B C 1 2 3" oninput="this.value=this.value.toUpperCase()">
+        <button class="btn btn-secondary" onclick="joinRoom()" id="btn-join">Join Room</button>
+      </div>
+    </div>
+
+    <!-- Waiting room (shown after room joined/created) -->
+    <div class="lobby-box" id="lobby-waiting-box" style="display:none;">
+      <div id="room-code-display" class="room-code-display" style="display:none;">
+        <div class="code-big" id="room-code-text">——</div>
+        <p>Share this code with your friends</p>
+      </div>
+
+      <h3 style="margin-top:4px;">Players in Room</h3>
+      <div class="lobby-players" id="lobby-player-list"></div>
+
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-success" id="btn-start-game" onclick="startGame()" disabled style="display:none;">
+          ▶ Start Game
+        </button>
+        <div id="lobby-waiting-msg" style="font-size:12px;color:var(--muted);font-weight:700;text-align:center;">
+          Waiting for host to start…
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     UNO GAME
+══════════════════════════════ -->
+<div id="screen-uno" class="screen">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="confirmLeaveGame()">← Leave</button>
+    <div class="topbar-title">🃏 UNO</div>
+    <div class="topbar-meta">
+      <span id="active-color-label"></span>
+      Round <span id="uno-round">1</span>
+    </div>
+  </div>
+
+  <div class="uno-table">
+    <div class="players-row" id="uno-players"></div>
+
+    <div class="game-arena">
+      <div class="arena-ring"></div>
+      <div class="arena-ring-2"></div>
+      <div class="turn-arrows">
+        <svg width="220" height="220" viewBox="0 0 220 220">
+          <defs>
+            <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+              <polygon points="0 0,6 3,0 6" fill="rgba(249,192,35,.5)"/>
+            </marker>
+          </defs>
+          <path d="M 110 20 A 90 90 0 1 1 20 110" fill="none" stroke="rgba(249,192,35,.28)" stroke-width="2" stroke-dasharray="8 4" marker-end="url(#arrowhead)" id="turn-arrow-path"/>
+        </svg>
+      </div>
+      <div class="discard-pile" id="discard-pile"></div>
+      <div class="draw-pile-btn" onclick="drawCardAction()" title="Draw a card">
+        <div class="draw-pile-inner">
+          <div class="card-back-css" id="draw-pile-card" style="width:62px;height:93px;">
+            <div class="card-back-logo">UNO</div>
+          </div>
+          <div class="draw-pile-label">DRAW</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-log" id="game-log"></div>
+  </div>
+
+  <div class="your-hand">
+    <div class="turn-indicator" id="turn-indicator">⏳ Waiting for turn…</div>
+    <div class="hand-cards" id="hand-cards"></div>
+    <div class="action-bar">
+      <button class="play-btn" id="play-btn" onclick="playSelected()" disabled>Play Card</button>
+      <button class="uno-shout-btn" onclick="shoutUno()">UNO!</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     TRUTH OR DARE
+══════════════════════════════ -->
+<div id="screen-tod" class="screen">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="leaveLobby()">← Leave</button>
+    <div class="topbar-title">🎯 Truth or Dare</div>
+    <div class="topbar-meta">Round <span id="tod-round">1</span></div>
+  </div>
+  <div class="tod-arena">
+    <div class="tod-players" id="tod-players"></div>
+    <div class="tod-wheel-area">
+      <div class="wheel-ring" id="tod-wheel" onclick="spinWheel()">
+        <div class="wheel-inner">
+          <span id="wheel-emoji">🎯</span>
+          <span id="wheel-label">Spin!</span>
+        </div>
+      </div>
+      <div class="tod-choice-btns" id="tod-choice-btns" style="display:none;">
+        <button class="tod-btn tod-truth-btn" onclick="chooseTod('truth')">💬 Truth</button>
+        <button class="tod-btn tod-dare-btn" onclick="chooseTod('dare')">🎯 Dare</button>
+      </div>
+    </div>
+    <div id="tod-prompt-area"></div>
+  </div>
+</div>
+
+<!-- Color Picker Modal -->
+<div class="modal-overlay" id="color-modal">
+  <div class="color-modal">
+    <h3>Choose a Color</h3>
+    <div class="color-picker-grid">
+      <button class="color-pick-btn cpb-red"    onclick="pickColor('red')">🔴</button>
+      <button class="color-pick-btn cpb-blue"   onclick="pickColor('blue')">🔵</button>
+      <button class="color-pick-btn cpb-yellow" onclick="pickColor('yellow')">🟡</button>
+      <button class="color-pick-btn cpb-green"  onclick="pickColor('green')">🟢</button>
+    </div>
+  </div>
+</div>
+
+<!-- Win / Game Over Modal -->
+<div class="modal-overlay" id="win-modal">
+  <div class="modal-box win-modal-content">
+    <span class="win-emoji" id="win-emoji">🎉</span>
+    <h3 id="win-title">You Win!</h3>
+    <p class="win-subtitle" id="win-subtitle">Great game!</p>
+    <div class="btn-row" style="margin-top:16px;">
+      <button class="btn btn-primary" onclick="closeWinModal()">Back to Lobby</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════
+// ██████  CONFIG  ██████
+// Fill these in before deploying.
+// ═══════════════════════════════════════════════════════════════
+const CFG = {
+  SUPABASE_URL:      'https://hfxagwcwaalrmaqzhyfj.supabase.co',   // e.g. 'https://xxxxxxxxxxxx.supabase.co'
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmeGFnd2N3YWFscm1hcXpoeWZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MzY5NzIsImV4cCI6MjA5MDIxMjk3Mn0.LMFfFRmqW34PT70zAOTj4zsUWmrDl_P4MXL0wZBkxYc',   // your anon/public key
+  DISCORD_CLIENT_ID: '1487252546060947476',   // optional: Discord app client ID for Activity mode
+  CARD_PATH: './',         // path prefix for card PNGs (default: same dir)
+};
+
+// ═══════════════════════════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════════════════════════
+let SB      = null;    // Supabase client
+let CH      = null;    // Realtime channel
+let discordSdk = null; // Discord Embedded App SDK (if in Activity)
+
+let MY_ID   = crypto.randomUUID().slice(0,8);
+let MY_NAME = '';
+
+let isHost  = false;
+let roomCode = '';
+let gameType = '';   // 'uno' | 'tod'
+
+// Lobby: presence-derived player map { [id]: { name, isHost } }
+let lobbyPlayers = {};
+
+// Game state — maintained by all players (host is authoritative)
+let G = null;
+
+// UNO local selection
+let selectedIdx = null;
+
+// ═══════════════════════════════════════════════════════════════
+// CARD CONSTANTS & HELPERS
+// ═══════════════════════════════════════════════════════════════
+const CARD_COLORS  = ['red','blue','green','yellow'];
+const COLOR_PREFIX = { red:'R', blue:'B', green:'G', yellow:'Y' };
+const VALUE_SUFFIX = { skip:'S', reverse:'R', draw2:'A2' };
+const COLOR_DOT    = { red:'#e8302c', blue:'#1a73e8', green:'#2db552', yellow:'#f9c023', black:'#555' };
+const COLOR_EMOJI  = { red:'🔴', blue:'🔵', green:'🟢', yellow:'🟡', black:'⬛' };
+const VALUE_LABEL  = { skip:'⛔ Skip', reverse:'↩️ Reverse', draw2:'+2', wild:'🌈 Wild', wild4:'🌈 +4 Wild' };
+
+function cardFilename({ color, value }) {
+  if (value === 'wild')  return 'WC.png';
+  if (value === 'wild4') return 'W4.png';
+  const C = COLOR_PREFIX[color] || 'R';
+  const V = VALUE_SUFFIX[value]  ?? value;
+  return C + V + '.png';
+}
+
+function cardLabel({ color, value }) {
+  if (value === 'wild' || value === 'wild4') return VALUE_LABEL[value] || value;
+  const c = color.charAt(0).toUpperCase() + color.slice(1);
+  const v = VALUE_LABEL[value] || value;
+  return `${c} ${v}`;
+}
+
+function isPlayable(card) {
+  if (!G || !G.started || !isMyTurn()) return false;
+  if (G.drawStack > 0) {
+    // Can only play a draw card of same type to stack, or must draw
+    if (G.topCard.value === 'draw2')  return card.value === 'draw2';
+    if (G.topCard.value === 'wild4')  return card.value === 'wild4';
+  }
+  if (card.color === 'black') return true;
+  return card.color === G.topColor || card.value === G.topCard.value;
+}
+
+function isMyTurn() {
+  if (!G || !G.started) return false;
+  return G.turnOrder[G.currentTurnIdx] === MY_ID;
+}
+
+function currentTurnName() {
+  if (!G) return '';
+  const id = G.turnOrder[G.currentTurnIdx];
+  return G.players[id]?.name || 'Someone';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DECK BUILDER
+// ═══════════════════════════════════════════════════════════════
+function buildDeck() {
+  const deck = [];
+  for (const color of CARD_COLORS) {
+    deck.push({ color, value: '0' });
+    for (const v of ['1','2','3','4','5','6','7','8','9','skip','reverse','draw2']) {
+      deck.push({ color, value: v });
+      deck.push({ color, value: v });
+    }
+  }
+  for (let i = 0; i < 4; i++) {
+    deck.push({ color:'black', value:'wild'  });
+    deck.push({ color:'black', value:'wild4' });
+  }
+  return deck;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DOM CARD BUILDERS
+// ═══════════════════════════════════════════════════════════════
+function cardEl(card, { w=56, h=84, idx=-1, inHand=false, isDiscard=false } = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'card-img-wrap' +
+    (inHand ? ' clickable' : '') +
+    (inHand && idx === selectedIdx ? ' selected' : '') +
+    (inHand && isPlayable(card) ? ' playable' : '');
+  wrap.style.cssText = `display:inline-block;`;
+
+  const img = document.createElement('img');
+  img.src   = CFG.CARD_PATH + cardFilename(card);
+  img.alt   = cardLabel(card);
+  img.style.cssText = `width:${w}px;height:${h}px;`;
+  if (isDiscard) img.classList.add('card-play-anim');
+
+  // Fallback to CSS card if image not found
+  img.onerror = function() {
+    this.style.display = 'none';
+    const fb = document.createElement('div');
+    fb.className = `card-css card-${card.color}`;
+    fb.style.cssText = `width:${w}px;height:${h}px;font-size:${Math.round(w*.38)}px;`;
+    fb.textContent = VALUE_LABEL[card.value]?.split(' ')[0] ?? card.value;
+    wrap.appendChild(fb);
+  };
+  wrap.appendChild(img);
+
+  if (inHand) {
+    wrap.addEventListener('click', () => selectCard(idx));
+  }
+  return wrap;
+}
+
+function cardBackEl(w=62, h=93) {
+  const div = document.createElement('div');
+  div.className = 'card-back-css';
+  div.style.cssText = `width:${w}px;height:${h}px;flex-shrink:0;`;
+  div.innerHTML = `<div class="card-back-logo" style="width:${Math.round(w*.65)}px;height:${Math.round(w*.65)}px;font-size:${Math.round(w*.24)}px;">UNO</div>`;
+  return div;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPABASE INIT
+// ═══════════════════════════════════════════════════════════════
+function initSupabase() {
+  if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) {
+    console.warn('Supabase not configured — multiplayer disabled. Fill CFG at top of script.');
+    return false;
+  }
+  SB = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REALTIME CHANNEL
+// ═══════════════════════════════════════════════════════════════
+async function setupChannel(code) {
+  if (CH) { await SB.removeChannel(CH); CH = null; }
+  if (!SB) return;
+
+  CH = SB.channel(`uno-room-${code}`, {
+    config: { broadcast: { self: true }, presence: { key: MY_ID } }
+  });
+
+  // ── Presence (player list) ──
+  CH.on('presence', { event: 'sync' }, () => {
+    const state = CH.presenceState();
+    lobbyPlayers = {};
+    for (const id in state) {
+      const p = state[id][0];
+      if (p) lobbyPlayers[id] = p;
+    }
+    updateLobbyUI();
+    if (G && G.started) updatePlayerChips();
+  });
+
+  CH.on('presence', { event: 'join' }, ({ key, newPresences }) => {
+    if (newPresences[0]) showToast(`👋 ${newPresences[0].name} joined`);
+  });
+
+  CH.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+    if (leftPresences[0]) showToast(`👋 ${leftPresences[0].name} left`);
+    if (G && G.started && G.players[key]) {
+      // Mark disconnected
+      G.players[key].connected = false;
+      addLog(`${G.players[key].name} disconnected.`, 'log-warn');
+      if (isHost) {
+        // Skip their turns automatically
+        if (G.turnOrder[G.currentTurnIdx] === key) advanceTurn(1);
+        broadcastFullState();
+      }
+    }
+  });
+
+  // ── Broadcasts ──
+  CH.on('broadcast', { event: 'game_state' }, ({ payload }) => {
+    if (isHost) return; // host maintains their own state
+    applyStateUpdate(payload);
+  });
+
+  CH.on('broadcast', { event: 'game_action' }, ({ payload }) => {
+    if (!isHost) return; // only host processes actions
+    processAction(payload);
+  });
+
+  CH.on('broadcast', { event: 'tod_action' }, ({ payload }) => {
+    applyTodAction(payload);
+  });
+
+  await CH.subscribe(async (status) => {
+    if (status === 'SUBSCRIBED') {
+      await CH.track({ id: MY_ID, name: MY_NAME, isHost });
+    }
+  });
+}
+
+function broadcast(event, payload) {
+  if (!CH) return;
+  CH.send({ type:'broadcast', event, payload });
+}
+
+function broadcastFullState() {
+  if (!isHost || !CH) return;
+  broadcast('game_state', {
+    topCard:        G.topCard,
+    topColor:       G.topColor,
+    turnOrder:      G.turnOrder,
+    currentTurnIdx: G.currentTurnIdx,
+    direction:      G.direction,
+    drawStack:      G.drawStack,
+    players:        G.players,
+    started:        G.started,
+    over:           G.over,
+    winner:         G.winner,
+    round:          G.round,
+    deckSize:       G.deck.length,
+    log:            G.log.slice(-20),
+    hands:          G.hands, // all hands broadcast (party game, acceptable)
+  });
+}
+
+function applyStateUpdate(payload) {
+  if (!G) G = {};
+  Object.assign(G, payload);
+  // Sync my hand
+  if (G.hands && G.hands[MY_ID]) G.myHand = G.hands[MY_ID];
+  renderGame();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOBBY
+// ═══════════════════════════════════════════════════════════════
+function openLobby(type) {
+  gameType = type;
+  document.getElementById('lobby-title').textContent = type === 'uno' ? '🃏 UNO Lobby' : '🎯 ToD Lobby';
+  showScreen('screen-lobby');
+  // Reset lobby UI
+  document.getElementById('lobby-name-box').style.display   = '';
+  document.getElementById('lobby-room-box').style.display   = 'none';
+  document.getElementById('lobby-waiting-box').style.display = 'none';
+  document.getElementById('inp-name').value = MY_NAME || '';
+  document.getElementById('btn-confirm-name').disabled = !MY_NAME;
+  if (MY_NAME) confirmName();
+}
+
+function onNameInput() {
+  const v = document.getElementById('inp-name').value.trim();
+  document.getElementById('btn-confirm-name').disabled = v.length < 1;
+}
+
+function confirmName() {
+  const v = document.getElementById('inp-name').value.trim();
+  if (!v) return;
+  MY_NAME = v;
+  document.getElementById('lobby-name-box').style.display = 'none';
+  document.getElementById('lobby-room-box').style.display = '';
+}
+
+function genRoomCode() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(3)))
+    .map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b & 31]).join('');
+}
+
+async function createRoom() {
+  roomCode = genRoomCode();
+  isHost = true;
+  await _enterRoom();
+  document.getElementById('room-code-display').style.display = '';
+  document.getElementById('room-code-text').textContent = roomCode;
+  document.getElementById('btn-start-game').style.display = '';
+  document.getElementById('lobby-waiting-msg').style.display = 'none';
+}
+
+async function joinRoom() {
+  const code = document.getElementById('inp-room-code').value.trim().toUpperCase();
+  if (code.length < 3) { showToast('⚠️ Enter a room code first'); return; }
+  roomCode = code;
+  isHost = false;
+  await _enterRoom();
+}
+
+async function _enterRoom() {
+  document.getElementById('lobby-room-box').style.display   = 'none';
+  document.getElementById('lobby-waiting-box').style.display = '';
+  document.getElementById('lobby-player-count').textContent = '1 player';
+
+  if (SB) {
+    await setupChannel(roomCode);
+  } else {
+    // Offline mode: pretend we're in a room alone
+    lobbyPlayers[MY_ID] = { id:MY_ID, name:MY_NAME, isHost };
+    updateLobbyUI();
+    if (isHost) {
+      document.getElementById('btn-start-game').style.display = '';
+      document.getElementById('lobby-waiting-msg').style.display = 'none';
+    }
+  }
+}
+
+function updateLobbyUI() {
+  const list = document.getElementById('lobby-player-list');
+  list.innerHTML = '';
+  const ids = Object.keys(lobbyPlayers);
+
+  document.getElementById('lobby-player-count').textContent =
+    ids.length + ' player' + (ids.length !== 1 ? 's' : '');
+
+  const BG_COLORS = ['#5865F2','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
+  ids.forEach((id, i) => {
+    const p = lobbyPlayers[id];
+    const item = document.createElement('div');
+    item.className = 'lobby-player-item';
+    const initials = (p.name||'?').slice(0,1).toUpperCase();
+    item.innerHTML = `
+      <div class="lp-avatar" style="background:${BG_COLORS[i%BG_COLORS.length]}">${initials}</div>
+      <div class="lp-name">${p.name}</div>
+      ${p.isHost ? '<span class="lp-badge host">HOST</span>' : ''}
+      ${id === MY_ID ? '<span class="lp-badge you">YOU</span>' : ''}
+    `;
+    list.appendChild(item);
+  });
+
+  // Enable start button if host and 2+ players (or allow solo for testing)
+  if (isHost) {
+    const btn = document.getElementById('btn-start-game');
+    btn.disabled = ids.length < 2;
+    btn.title = ids.length < 2 ? 'Need at least 2 players' : '';
+  }
+}
+
+async function startGame() {
+  if (!isHost) return;
+  if (gameType === 'tod') {
+    initTodWithPlayers();
+    showScreen('screen-tod');
+    return;
+  }
+  // UNO
+  const playerIds = Object.keys(lobbyPlayers);
+  if (playerIds.length < 2 && SB) {
+    showToast('⚠️ Need at least 2 players to start'); return;
+  }
+  initGameState(playerIds);
+  showScreen('screen-uno');
+  renderGame();
+  broadcastFullState();
+  // Tell others to switch to game screen
+  broadcast('game_state', { ...getSerializableState(), screenSwitch:'uno' });
+}
+
+function leaveLobby() {
+  if (CH) { SB?.removeChannel(CH); CH = null; }
+  roomCode = '';
+  isHost = false;
+  G = null;
+  selectedIdx = null;
+  showScreen('screen-launcher');
+}
+
+function confirmLeaveGame() {
+  if (confirm('Leave the game?')) leaveLobby();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GAME ENGINE
+// ═══════════════════════════════════════════════════════════════
+function initGameState(playerIds) {
+  const deck = shuffle(buildDeck());
+  const hands = {};
+  const players = {};
+  const BG = ['#5865F2','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f43f5e','#14b8a6'];
+
+  for (let i = 0; i < playerIds.length; i++) {
+    const id = playerIds[i];
+    hands[id]   = deck.splice(0, 7);
+    players[id] = {
+      name: lobbyPlayers[id]?.name || `P${i+1}`,
+      cardCount: 7,
+      score: 0,
+      connected: true,
+      color: BG[i % BG.length],
+    };
+  }
+
+  let topCard;
+  do { topCard = deck.shift(); } while (topCard.color === 'black');
+
+  const turnOrder = shuffle([...playerIds]);
+
+  G = {
+    deck, hands, players,
+    topCard, topColor: topCard.color,
+    turnOrder, currentTurnIdx: 0,
+    direction: 1, drawStack: 0,
+    started: true, over: false, winner: null,
+    round: 1,
+    log: [
+      { text:'🎮 Game started!', cls:'log-system' },
+      { text:`${players[turnOrder[0]]?.name || 'Player'} goes first.`, cls:'log-warn' },
+    ],
+    myHand: null,
+  };
+  G.myHand = G.hands[MY_ID] || [];
+}
+
+function getSerializableState() {
+  if (!G) return {};
+  return {
+    topCard:        G.topCard,
+    topColor:       G.topColor,
+    turnOrder:      G.turnOrder,
+    currentTurnIdx: G.currentTurnIdx,
+    direction:      G.direction,
+    drawStack:      G.drawStack,
+    players:        G.players,
+    started:        G.started,
+    over:           G.over,
+    winner:         G.winner,
+    round:          G.round,
+    deckSize:       G.deck.length,
+    log:            G.log.slice(-20),
+    hands:          G.hands,
+  };
+}
+
+// HOST: Process an action sent by any player
+function processAction({ type, playerId, card, chosenColor }) {
+  if (!G || !isHost) return;
+
+  if (type === 'play_card') {
+    // Remove card from player's hand
+    if (G.hands[playerId]) {
+      const idx = G.hands[playerId].findIndex(c => c.color===card.color && c.value===card.value);
+      if (idx !== -1) G.hands[playerId].splice(idx, 1);
+    }
+    G.players[playerId].cardCount = G.hands[playerId]?.length ?? 0;
+    G.topCard  = card;
+    G.topColor = chosenColor || card.color;
+
+    addLog(`${G.players[playerId]?.name || 'Player'} played ${cardLabel({ color:G.topColor, value:card.value })}.`,
+      playerId === MY_ID ? 'log-you' : '');
+
+    if (checkWin(playerId)) { broadcastFullState(); return; }
+    applyCardEffect(card, playerId, chosenColor);
+
+  } else if (type === 'draw_card') {
+    if (!G.deck.length) reshuffleDeck();
+    const drawn = G.deck.splice(0, Math.max(1, G.drawStack));
+    G.hands[playerId] = [...(G.hands[playerId]||[]), ...drawn];
+    G.players[playerId].cardCount = G.hands[playerId].length;
+    if (G.drawStack > 0) {
+      addLog(`${G.players[playerId]?.name} drew ${G.drawStack} cards!`, 'log-warn');
+      G.drawStack = 0;
+    } else {
+      addLog(`${G.players[playerId]?.name || 'Player'} drew a card.`,
+        playerId === MY_ID ? 'log-you' : '');
+    }
+    advanceTurn(1);
+
+  } else if (type === 'uno_shout') {
+    addLog(`🗣️ ${G.players[playerId]?.name} shouted UNO!`, 'log-warn');
+  }
+
+  if (G.hands && G.hands[MY_ID]) G.myHand = G.hands[MY_ID];
+  broadcastFullState();
+  renderGame();
+}
+
+function applyCardEffect(card, playerId, chosenColor) {
+  const nextIdx = getNextIdx(1);
+  const nextId  = G.turnOrder[nextIdx];
+
+  if (card.value === 'skip') {
+    addLog(`${G.players[nextId]?.name} was skipped!`, 'log-warn');
+    advanceTurn(2);
+
+  } else if (card.value === 'reverse') {
+    G.direction *= -1;
+    addLog(`Direction reversed!`, 'log-system');
+    advanceTurn(G.turnOrder.length === 2 ? 2 : 1);
+
+  } else if (card.value === 'draw2') {
+    G.drawStack += 2;
+    addLog(`${G.players[nextId]?.name} must draw 2 (or stack)!`, 'log-warn');
+    advanceTurn(1);
+
+  } else if (card.value === 'wild4') {
+    G.drawStack += 4;
+    addLog(`${G.players[nextId]?.name} must draw 4 (or stack)!`, 'log-warn');
+    advanceTurn(1);
+
+  } else {
+    advanceTurn(1);
+  }
+}
+
+function getNextIdx(offset) {
+  const n = G.turnOrder.length;
+  return ((G.currentTurnIdx + G.direction * offset) % n + n) % n;
+}
+
+function advanceTurn(steps) {
+  for (let i = 0; i < steps; i++) {
+    G.currentTurnIdx = getNextIdx(1);
+  }
+}
+
+function checkWin(playerId) {
+  if ((G.hands[playerId]?.length ?? 1) === 0) {
+    G.over = true;
+    G.winner = playerId;
+    G.players[playerId].score = (G.players[playerId].score || 0) + 1;
+    addLog(`🏆 ${G.players[playerId]?.name} wins this round!`, 'log-warn');
+    return true;
+  }
+  return false;
+}
+
+function reshuffleDeck() {
+  G.deck = shuffle(buildDeck());
+}
+
+function addLog(text, cls='') {
+  G.log = G.log || [];
+  G.log.push({ text, cls });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOCAL ACTIONS  (client → host)
+// ═══════════════════════════════════════════════════════════════
+function selectCard(idx) {
+  if (!isMyTurn()) { showToast('⏳ Not your turn!'); return; }
+  selectedIdx = selectedIdx === idx ? null : idx;
+  renderHand();
+  document.getElementById('play-btn').disabled = selectedIdx === null;
+}
+
+function playSelected() {
+  if (selectedIdx === null || !isMyTurn()) return;
+  const card = G.myHand[selectedIdx];
+  if (!isPlayable(card)) { showToast("❌ Can't play that card right now!"); return; }
+
+  if (card.color === 'black') {
+    document.getElementById('color-modal').classList.add('show');
+    return;
+  }
+  executePlay(card, selectedIdx, null);
+}
+
+function executePlay(card, idx, chosenColor) {
+  // Optimistic update of my hand locally
+  G.myHand.splice(idx, 1);
+  if (G.hands[MY_ID]) G.hands[MY_ID] = [...G.myHand];
+  selectedIdx = null;
+
+  if (G.myHand.length === 1) setTimeout(() => showToast('⚠️ 1 card left — shout UNO!'), 200);
+
+  if (isHost) {
+    processAction({ type:'play_card', playerId:MY_ID, card, chosenColor });
+  } else {
+    broadcast('game_action', { type:'play_card', playerId:MY_ID, card, chosenColor });
+    renderGame();
+  }
+}
+
+function drawCardAction() {
+  if (!isMyTurn()) { showToast('⏳ Not your turn!'); return; }
+  selectedIdx = null;
+
+  if (isHost) {
+    processAction({ type:'draw_card', playerId:MY_ID });
+  } else {
+    broadcast('game_action', { type:'draw_card', playerId:MY_ID });
+    renderGame();
+  }
+}
+
+function pickColor(color) {
+  document.getElementById('color-modal').classList.remove('show');
+  const idx = selectedIdx;
+  if (idx === null || !G.myHand[idx]) return;
+  const card = G.myHand[idx];
+  executePlay(card, idx, color);
+}
+
+function shoutUno() {
+  if (!G || !G.myHand) return;
+  if (G.myHand.length === 1) {
+    showToast('🗣️ UNO! Nice call!');
+    broadcast('game_action', { type:'uno_shout', playerId:MY_ID });
+    if (isHost) addLog(`🗣️ ${G.players[MY_ID]?.name} shouted UNO!`, 'log-warn');
+  } else {
+    showToast(`😅 You have ${G.myHand.length} cards — not UNO yet!`);
+  }
+}
+
+function closeWinModal() {
+  document.getElementById('win-modal').classList.remove('show');
+  G.over = false;
+  showScreen('screen-lobby');
+  // Re-enter the lobby (keep the channel)
+  document.getElementById('lobby-room-box').style.display = 'none';
+  document.getElementById('lobby-waiting-box').style.display = '';
+  if (isHost) {
+    document.getElementById('btn-start-game').style.display = '';
+    document.getElementById('lobby-waiting-msg').style.display = 'none';
+    document.getElementById('room-code-display').style.display = '';
+    document.getElementById('room-code-text').textContent = roomCode;
+  }
+  updateLobbyUI();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════════════
+function renderGame() {
+  if (!G || !G.started) return;
+
+  // Sync screen if signaled by state update
+  const curScreen = document.querySelector('.screen.active')?.id;
+  if (curScreen !== 'screen-uno') showScreen('screen-uno');
+
+  renderPlayers();
+  renderDiscardPile();
+  renderHand();
+  renderLog();
+  renderTurnState();
+  updateActiveColorLabel();
+
+  document.getElementById('uno-round').textContent = G.round || 1;
+
+  if (G.over) showWinModal(G.winner);
+}
+
+function renderPlayers() {
+  const container = document.getElementById('uno-players');
+  container.innerHTML = '';
+  const myTurn = isMyTurn();
+  const curTurnId = G.turnOrder[G.currentTurnIdx];
+
+  G.turnOrder.forEach(id => {
+    const p = G.players[id];
+    if (!p) return;
+    const chip = document.createElement('div');
+    const isMe = id === MY_ID;
+    chip.className = 'player-chip' +
+      (isMe && myTurn ? ' active-player' : '') +
+      (!isMe && id === curTurnId ? ' other-active-player' : '');
+    chip.innerHTML = `
+      <div class="player-avatar" style="background:${p.color}">
+        ${(p.name||'?').slice(0,1).toUpperCase()}
+        <div class="card-count-badge">${isMe ? G.myHand.length : (p.cardCount ?? 0)}</div>
+      </div>
+      <div class="player-name">${isMe ? 'You' : p.name}</div>
+      <div class="player-score">Score: ${p.score || 0}</div>
+    `;
+    container.appendChild(chip);
+  });
+}
+
+function renderDiscardPile() {
+  const pile = document.getElementById('discard-pile');
+  pile.innerHTML = '';
+  if (!G.topCard) return;
+  // Show with chosen color for wilds
+  const displayCard = G.topCard.color === 'black'
+    ? { ...G.topCard, _displayColor: G.topColor }
+    : G.topCard;
+  const el = cardEl(G.topCard, { w:80, h:120, isDiscard:true });
+  pile.appendChild(el);
+}
+
+function renderHand() {
+  const hand = document.getElementById('hand-cards');
+  hand.innerHTML = '';
+  if (!G.myHand) return;
+  G.myHand.forEach((card, i) => {
+    const el = cardEl(card, { w:52, h:78, idx:i, inHand:true });
+    hand.appendChild(el);
+  });
+  document.getElementById('play-btn').disabled = selectedIdx === null;
+}
+
+function renderLog() {
+  const log = document.getElementById('game-log');
+  if (!G.log) return;
+  log.innerHTML = G.log.slice(-6).map(e =>
+    `<div class="log-entry ${e.cls||''}">${e.text}</div>`
+  ).join('');
+}
+
+function renderTurnState() {
+  const ind = document.getElementById('turn-indicator');
+  if (isMyTurn()) {
+    ind.textContent = '⚡ Your turn!';
+    ind.className = 'turn-indicator is-your-turn';
+    if (G.drawStack > 0) {
+      ind.textContent = `⚡ Draw ${G.drawStack} or stack!`;
+    }
+  } else {
+    ind.textContent = `⏳ ${currentTurnName()}'s turn…`;
+    ind.className = 'turn-indicator';
+  }
+}
+
+function updateActiveColorLabel() {
+  const lbl = document.getElementById('active-color-label');
+  if (!G || !G.topColor) { lbl.innerHTML = ''; return; }
+  lbl.innerHTML = `<span class="active-color-dot" style="background:${COLOR_DOT[G.topColor]};"></span>`;
+}
+
+function updatePlayerChips() {
+  if (G && G.started) renderPlayers();
+}
+
+function showWinModal(winnerId) {
+  const p = G.players[winnerId];
+  const isMe = winnerId === MY_ID;
+  document.getElementById('win-emoji').textContent   = isMe ? '🏆' : '🎉';
+  document.getElementById('win-title').textContent   = isMe ? 'You Win!' : `${p?.name || 'Player'} Wins!`;
+  document.getElementById('win-subtitle').textContent = isMe ? 'Great play! 🎊' : 'Better luck next round!';
+  document.getElementById('win-modal').classList.add('show');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TRUTH OR DARE
+// ═══════════════════════════════════════════════════════════════
+const TRUTHS = [
+  "What's the most embarrassing thing you've texted to the wrong person?",
+  "Have you ever lied to get out of plans with a friend?",
+  "What's your most irrational fear?",
+  "Have you ever pretended to be sick to skip school or work?",
+  "What's the pettiest thing you've ever done to get revenge?",
+  "What's something you've done that you'd be mortified if your parents found out?",
+  "Have you ever stalked an ex on social media? How recently?",
+  "What's the most childish thing you still do?",
+  "What's a secret you've never told anyone in this call?",
+  "What's the most trouble you've ever been in?",
+];
+const DARES = [
+  "Send a compliment to the 3rd person in your contact list — right now.",
+  "Speak in an accent for the next 2 rounds.",
+  "Share the last song you listened to.",
+  "Type your next 3 messages with your eyes closed.",
+  "Change your server nickname to something embarrassing for 10 minutes.",
+  "Write a 2-sentence love poem about the player to your left.",
+  "Do your best impression of another player until they guess who you are.",
+  "Send your most recent camera roll photo to the group.",
+];
+
+const todState = {
+  players: [],
+  currentIdx: 0,
+  round: 1,
+  spun: false,
+};
+
+function initTodWithPlayers() {
+  const BG = ['#818cf8','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
+  const ids = Object.keys(lobbyPlayers);
+  todState.players = ids.map((id, i) => ({
+    id, name: lobbyPlayers[id]?.name || `P${i+1}`,
+    color: BG[i%BG.length], score:0, spotlight: i===0,
+  }));
+  todState.currentIdx = 0;
+  todState.round = 1;
+  todState.spun = false;
+  renderTod();
+}
+
+function renderTod() {
+  const container = document.getElementById('tod-players');
+  container.innerHTML = '';
+  todState.players.forEach(p => {
+    const chip = document.createElement('div');
+    chip.className = `tod-player-chip${p.spotlight ? ' spotlight' : ''}`;
+    chip.innerHTML = `
+      <div class="tod-avatar" style="background:${p.color}">${p.name.slice(0,1).toUpperCase()}</div>
+      <div class="tod-pname">${p.name}</div>
+      <div class="tod-pscore">⭐ ${p.score}</div>
+    `;
+    container.appendChild(chip);
+  });
+  document.getElementById('tod-round').textContent = todState.round;
+  document.getElementById('tod-choice-btns').style.display = 'none';
+  document.getElementById('tod-prompt-area').innerHTML = '';
+  document.getElementById('wheel-emoji').textContent = '🎯';
+  document.getElementById('wheel-label').textContent  = 'Spin!';
+  todState.spun = false;
+}
+
+function spinWheel() {
+  if (todState.spun) return;
+  todState.spun = true;
+  const wheel = document.getElementById('tod-wheel');
+  wheel.classList.add('spinning');
+  setTimeout(() => {
+    wheel.classList.remove('spinning');
+    const cur = todState.players[todState.currentIdx];
+    document.getElementById('wheel-emoji').textContent = '✨';
+    document.getElementById('wheel-label').textContent  = cur.name + '!';
+    document.getElementById('tod-choice-btns').style.display = 'flex';
+    showToast(`🎯 ${cur.name}'s turn!`);
+    if (SB) broadcast('tod_action', { type:'spin', playerName: cur.name });
+  }, 900);
+}
+
+function chooseTod(type) {
+  document.getElementById('tod-choice-btns').style.display = 'none';
+  document.getElementById('tod-prompt-area').innerHTML = `
+    <div class="ai-thinking">
+      <span>🤖 Generating ${type}…</span>
+      <div class="ai-thinking-dots"><span></span><span></span><span></span></div>
+    </div>`;
+  setTimeout(() => showPrompt(type), 1200);
+}
+
+function showPrompt(type) {
+  const arr = type === 'truth' ? TRUTHS : DARES;
+  const prompt = arr[Math.floor(Math.random() * arr.length)];
+  const area = document.getElementById('tod-prompt-area');
+  area.innerHTML = `
+    <div class="prompt-card ${type}-card card-play-anim">
+      <div class="prompt-type">${type === 'truth' ? '💬 Truth' : '🎯 Dare'}</div>
+      <div class="prompt-text">${prompt}</div>
+      <div class="prompt-actions">
+        <button class="prompt-action-btn btn-complete" onclick="completePrompt()">✅ Done!</button>
+        <button class="prompt-action-btn btn-skip"     onclick="skipPrompt()">Skip (−1 pt)</button>
+      </div>
+    </div>`;
+}
+
+function completePrompt() {
+  const p = todState.players[todState.currentIdx];
+  p.score += 1;
+  showToast(`🎉 ${p.name} completed it! +1`);
+  advanceTod();
+}
+
+function skipPrompt() {
+  showToast(`😬 Skipped!`);
+  advanceTod();
+}
+
+function advanceTod() {
+  todState.players.forEach(p => p.spotlight = false);
+  todState.currentIdx = (todState.currentIdx + 1) % todState.players.length;
+  if (todState.currentIdx === 0) todState.round++;
+  todState.players[todState.currentIdx].spotlight = true;
+  setTimeout(() => renderTod(), 700);
+}
+
+function applyTodAction(payload) {
+  // Future: sync tod state in real-time
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCREEN MANAGER
+// ═══════════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
+let _toastTimer;
+function showToast(msg, ms=2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DISCORD ACTIVITY SDK (optional)
+// ═══════════════════════════════════════════════════════════════
+async function tryInitDiscordSdk() {
+  if (!CFG.DISCORD_CLIENT_ID) return null;
+  try {
+    // Dynamic ESM import from CDN — requires CSP to allow esm.sh
+    const { DiscordSDK } = await import('https://esm.sh/@discord/embedded-app-sdk@1');
+    discordSdk = new DiscordSDK(CFG.DISCORD_CLIENT_ID);
+    await discordSdk.ready();
+    const { code } = await discordSdk.commands.authorize({
+      client_id: CFG.DISCORD_CLIENT_ID,
+      response_type: 'code',
+      state: '',
+      prompt: 'none',
+      scope: ['identify','guilds.members.read'],
+    });
+    // Exchange code for token via your Supabase edge function:
+    //   POST /functions/v1/discord-auth  { code }  → { access_token }
+    // Then fetch user info from Discord API and set MY_NAME
+    console.log('Discord Activity SDK initialized');
+    return discordSdk;
+  } catch (e) {
+    console.log('Discord SDK not available — running in standalone mode');
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+(async function boot() {
+  // Try Discord SDK (non-blocking)
+  tryInitDiscordSdk().catch(() => {});
+
+  // Init Supabase
+  const hasSupa = initSupabase();
+  if (!hasSupa) {
+    console.warn('⚠️ Running without Supabase. Set CFG.SUPABASE_URL and CFG.SUPABASE_ANON_KEY for multiplayer.');
+  }
+})();
+</script>
+</body>
+</html>
