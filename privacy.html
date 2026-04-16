@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Jiro Bot - Privacy Policy</title>
+
+<style>
+  :root {
+    --card: rgba(255, 255, 255, 0.06);
+    --border: rgba(255, 255, 255, 0.12);
+    --text: #eaf0ff;
+    --muted: rgba(234, 240, 255, 0.72);
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    background: radial-gradient(circle at top, #1a2450, #0b0f1a);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* 🌌 Particle canvas */
+  canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 0;
+  }
+
+  header, .container, footer {
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    text-align: center;
+    padding: 60px 20px 30px;
+  }
+
+  header h1 {
+    font-size: 34px;
+    background: linear-gradient(90deg, #4fd1ff, #7c5cff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header p {
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  .container {
+    max-width: 950px;
+    margin: auto;
+    padding: 20px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 35px rgba(0,0,0,0.35);
+  }
+
+  h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+    color: #cfd8ff;
+  }
+
+  p {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  ul {
+    margin-top: 10px;
+    padding-left: 18px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 5px 12px;
+    font-size: 12px;
+    border-radius: 999px;
+    background: rgba(124, 92, 255, 0.15);
+    border: 1px solid rgba(124, 92, 255, 0.3);
+    color: #cbbdff;
+    margin-top: 10px;
+  }
+
+  /* 💬 Support card */
+  .support-card {
+    border: 1px solid rgba(124, 92, 255, 0.25);
+    background: linear-gradient(
+      135deg,
+      rgba(124, 92, 255, 0.08),
+      rgba(79, 209, 255, 0.05)
+    );
+  }
+
+  .support-box {
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(12px);
+  }
+
+  .support-title {
+    font-size: 14px;
+    color: #cfd8ff;
+    font-weight: 600;
+  }
+
+  .support-sub {
+    font-size: 13px;
+    color: rgba(234, 240, 255, 0.65);
+    margin-top: 4px;
+  }
+
+  .support-button {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(90deg, #7c5cff, #4fd1ff);
+    box-shadow: 0 6px 20px rgba(124, 92, 255, 0.25);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .support-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(124, 92, 255, 0.35);
+  }
+
+  footer {
+    text-align: center;
+    padding: 35px;
+    color: rgba(255,255,255,0.4);
+    font-size: 12px;
+  }
+</style>
+</head>
+
+<body>
+
+<!-- 🌌 Particle Canvas -->
+<canvas id="particles"></canvas>
+
+<header>
+  <h1>Jiro Bot Privacy Policy</h1>
+  <p>How your data is collected, used, and protected</p>
+  <div class="badge">Effective: April 16, 2026</div>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2>1. Overview</h2>
+    <p>
+      This Privacy Policy explains how Jiro Bot collects and processes limited data
+      to provide functionality, improve performance, and prevent abuse.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>2. Data We Collect</h2>
+    <p>We may collect:</p>
+    <ul>
+      <li>Discord User IDs</li>
+      <li>Discord Server IDs</li>
+      <li>Command usage logs</li>
+      <li>Server configuration settings</li>
+    </ul>
+    <p>No private messages or sensitive personal data are intentionally collected.</p>
+  </div>
+
+  <div class="card">
+    <h2>3. How We Use Data</h2>
+    <ul>
+      <li>To run bot features correctly</li>
+      <li>To store server preferences</li>
+      <li>To improve performance and reliability</li>
+      <li>To detect abuse or spam behavior</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>4. Data Storage</h2>
+    <p>
+      Data may be stored securely using third-party databases such as Supabase.
+      Data is only kept as long as necessary for bot functionality.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>5. Data Sharing</h2>
+    <p>
+      We do not sell or trade data. Data is only shared if required by law or to protect system integrity.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>6. Third-Party Services</h2>
+    <p>
+      Jiro Bot depends on Discord APIs and external hosting providers. Their policies also apply.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>7. Security</h2>
+    <p>
+      We take reasonable steps to protect data, but no system is 100% secure.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>8. User Rights</h2>
+    <p>
+      You may request deletion or clarification of stored data by contacting support.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>9. Retention</h2>
+    <p>
+      Data is retained only as long as needed. Inactive data may be removed periodically.
+    </p>
+  </div>
+
+  <!-- 💬 SUPPORT CARD -->
+  <div class="card support-card">
+
+    <h2>💬 Support & Community</h2>
+
+    <p>
+      Need help, found a bug, or want to suggest a feature? Join the official Jiro support server.
+    </p>
+
+    <div class="support-box">
+      <p class="support-title">Jiro Support Server</p>
+      <p class="support-sub">Help, updates, bug reports & announcements</p>
+
+      <a class="support-button" href="https://discord.gg/Tt67pSv9ca" target="_blank">
+        Join Support Server →
+      </a>
+    </div>
+
+  </div>
+
+  <div class="card">
+    <h2>10. Changes</h2>
+    <p>
+      This Privacy Policy may be updated at any time. Continued use means acceptance of changes.
+    </p>
+  </div>
+
+</div>
+
+<footer>
+  © 2026 Jiro Bot • Privacy Policy
+</footer>
+
+<!-- 🌌 Particle Script -->
+<script>
+const canvas = document.getElementById("particles");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let particles = [];
+
+for (let i = 0; i < 60; i++) {
+  particles.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    r: Math.random() * 2,
+    dx: (Math.random() - 0.5) * 0.6,
+    dy: (Math.random() - 0.5) * 0.6
+  });
+}
+
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  particles.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(124,92,255,0.5)";
+    ctx.fill();
+
+    p.x += p.dx;
+    p.y += p.dy;
+
+    if (p.x < 0 || p.x > canvas.width) p.dx *= -1;
+    if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
+  });
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+
+window.addEventListener("resize", () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+</script>
+
+</body>
+</html>
