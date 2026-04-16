@@ -1223,7 +1223,6 @@ function startAiGame() {
   isHost = true;
   roomCode = 'AI_' + genRoomCode();
   const aiCount = parseInt(document.getElementById('ai-count-select').value, 10) || 2;
-  // Build lobbyPlayers with human + AI
   lobbyPlayers = {};
   lobbyPlayers[MY_ID] = { id:MY_ID, name:MY_NAME, isHost:true };
   for (let i = 0; i < aiCount; i++) {
@@ -1235,7 +1234,8 @@ function startAiGame() {
   showScreen('screen-uno');
   document.getElementById('ai-mode-badge').style.display = '';
   renderGame();
-  startTurnTimer(); // start timer right away
+  // Kick off the first turn — could belong to AI or human
+  _afterTurnSetup();
 }
 
 function updateLobbyUI() {
@@ -1283,11 +1283,12 @@ async function startGame() {
   document.getElementById('ai-mode-badge').style.display = 'none';
   renderGame();
   broadcast('game_state', { ...getSerializableState(), screenSwitch:'uno' });
-  startTurnTimer();
+  _afterTurnSetup();
 }
 
 function leaveLobby() {
   stopTurnTimer();
+  clearTimeout(_aiThinkTimeout);
   if (CH) { SB?.removeChannel(CH); CH = null; }
   roomCode = '';
   isHost = false;
@@ -1406,8 +1407,19 @@ function processAction({ type, playerId, card, chosenColor }) {
   if (!isAiMode) broadcastFullState();
   renderGame();
   if (G.started && !G.over) {
-    startTurnTimer();
+    _afterTurnSetup();
+  }
+}
+
+// Called after every turn change — starts timer for human turns, AI thinking for AI turns
+function _afterTurnSetup() {
+  if (!G || !G.started || G.over) return;
+  const curId = G.turnOrder[G.currentTurnIdx];
+  if (isAiId(curId)) {
+    stopTurnTimer(); // No countdown during AI turn
     maybeScheduleAiTurn();
+  } else {
+    startTurnTimer();
   }
 }
 
@@ -1450,6 +1462,7 @@ function checkWin(playerId) {
     G.players[playerId].score = (G.players[playerId].score || 0) + 1;
     addLog(`${G.players[playerId]?.name} wins this round!`, 'log-warn');
     stopTurnTimer();
+    clearTimeout(_aiThinkTimeout);
     return true;
   }
   return false;
@@ -1643,7 +1656,8 @@ function playSelected() {
 }
 
 function executePlay(card, idx, chosenColor) {
-  stopTurnTimer(); // Stop timer on human play
+  clearTimeout(_aiThinkTimeout); // cancel any pending AI turn
+  stopTurnTimer();
   G.myHand.splice(idx, 1);
   if (G.hands[MY_ID]) G.hands[MY_ID] = [...G.myHand];
   selectedIdx = null;
@@ -1653,12 +1667,13 @@ function executePlay(card, idx, chosenColor) {
   } else {
     broadcast('game_action', { type:'play_card', playerId:MY_ID, card, chosenColor });
     renderGame();
-    startTurnTimer();
+    _afterTurnSetup();
   }
 }
 
 function drawCardAction() {
   if (!isMyTurn()) { showToast('Not your turn!', 'fa-hourglass-half'); return; }
+  clearTimeout(_aiThinkTimeout);
   stopTurnTimer();
   selectedIdx = null;
   if (isHost) {
@@ -1666,7 +1681,7 @@ function drawCardAction() {
   } else {
     broadcast('game_action', { type:'draw_card', playerId:MY_ID });
     renderGame();
-    startTurnTimer();
+    _afterTurnSetup();
   }
 }
 
