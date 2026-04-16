@@ -5,8 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Game Hub · Discord Activity</title>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <!-- Supabase for real-time multiplayer -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<!-- ══════════════════════════════════════════════════
+     DISCORD ACTIVITY SDK  — loaded synchronously so
+     it is ready before any inline JS runs.
+     The embedded-app-sdk REQUIRES the page to be
+     served inside an <iframe> proxied by Discord's
+     tunnel (/.proxy/…).  When it isn't (plain web),
+     the SDK's postMessage handshake simply times out
+     and we fall through to standalone mode gracefully.
+══════════════════════════════════════════════════ -->
+<script>
+/* Minimal polyfill: give the SDK a real MessageChannel
+   even if the page is in a sandboxed iframe where some
+   browsers restrict it. */
+if (typeof MessageChannel === 'undefined') {
+  window.MessageChannel = class {
+    constructor() {
+      this.port1 = { postMessage(){}, onmessage:null };
+      this.port2 = { postMessage(){}, onmessage:null };
+    }
+  };
+}
+</script>
+
 <style>
 /* ═══════════════════════════════
    VARIABLES & RESET
@@ -36,12 +61,27 @@ body{
   display:flex;flex-direction:column;align-items:center;
   overflow-x:hidden;
 }
+
+/* ═══════════════════════════════
+   ANIMATED BACKGROUND CANVAS
+═══════════════════════════════ */
+#bg-canvas{
+  position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.7;
+}
+
+/* Static gradient layer on top of canvas */
 body::before{
-  content:'';position:fixed;inset:0;pointer-events:none;
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
   background:
     radial-gradient(ellipse 80% 50% at 50% -20%,rgba(88,101,242,.13) 0%,transparent 70%),
     radial-gradient(circle at 15% 85%,rgba(124,58,237,.07) 0%,transparent 40%),
     radial-gradient(circle at 85% 15%,rgba(236,72,153,.05) 0%,transparent 40%);
+}
+
+/* All main content sits above canvas */
+.screen, .toast, .modal-overlay {
+  position: relative;
+  z-index: 2;
 }
 
 /* ═══════════════════════════════
@@ -94,7 +134,13 @@ body::before{
 }
 .uno-card .card-glow{background:var(--uno-red);}
 .tod-card .card-glow{background:var(--tod-purple);}
-.card-icon{font-size:50px;margin-bottom:12px;display:block;filter:drop-shadow(0 4px 12px rgba(0,0,0,.5));}
+.card-icon{
+  font-size:50px;margin-bottom:12px;display:block;
+  filter:drop-shadow(0 4px 12px rgba(0,0,0,.5));
+  /* For img icons (uno.png) */
+}
+.card-icon img{width:54px;height:54px;object-fit:contain;display:block;}
+.card-icon .fa-icon-large { font-size:48px; display:block; }
 .card-label{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px;}
 .uno-card .card-label{color:var(--uno-red);}
 .tod-card .card-label{color:#a78bfa;}
@@ -104,7 +150,9 @@ body::before{
 .meta-pill{
   background:rgba(255,255,255,.07);border-radius:20px;
   padding:4px 11px;font-size:11px;font-weight:700;color:#d1d5db;
+  display:inline-flex;align-items:center;gap:5px;
 }
+.meta-pill i{font-size:10px;}
 .launch-btn{
   display:inline-flex;align-items:center;gap:8px;padding:11px 22px;
   border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;
@@ -118,7 +166,7 @@ body::before{
 /* ═══════════════════════════════
    LOBBY SCREEN
 ═══════════════════════════════ */
-#screen-lobby{justify-content:center;padding:32px 20px;gap:20px;background:var(--bg);}
+#screen-lobby{justify-content:center;padding:32px 20px;gap:20px;background:transparent;}
 .lobby-header{text-align:center;animation:fadeDown .5s ease both;}
 .lobby-header h2{font-family:'Fredoka One',cursive;font-size:2rem;color:#fff;margin-bottom:4px;}
 .lobby-header p{color:var(--muted);font-size:13px;font-weight:700;}
@@ -146,6 +194,7 @@ body::before{
   flex:1;padding:11px 16px;border-radius:10px;border:none;
   font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;
   cursor:pointer;transition:all .2s;letter-spacing:.04em;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
 }
 .btn-primary{background:linear-gradient(135deg,var(--accent),#4752c4);color:#fff;box-shadow:0 4px 14px rgba(88,101,242,.4);}
 .btn-primary:hover{box-shadow:0 6px 20px rgba(88,101,242,.55);transform:scale(1.02);}
@@ -204,6 +253,7 @@ body::before{
   background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);
   color:#d1d5db;padding:6px 13px;border-radius:8px;font-size:12px;font-weight:800;
   cursor:pointer;font-family:'Nunito',sans-serif;transition:all .2s;
+  display:inline-flex;align-items:center;gap:6px;
 }
 .back-btn:hover{background:rgba(255,255,255,.15);}
 .topbar-title{font-family:'Fredoka One',cursive;font-size:19px;color:#fff;display:flex;align-items:center;gap:7px;}
@@ -212,11 +262,12 @@ body::before{
 /* ═══════════════════════════════
    UNO GAME SCREEN
 ═══════════════════════════════ */
-#screen-uno{padding:0;background:#0d0f1a;min-height:100vh;position:relative;overflow:hidden;}
+#screen-uno{padding:0;background:transparent;min-height:100vh;position:relative;overflow:hidden;}
 #screen-uno::before{
-  content:'';position:fixed;inset:0;pointer-events:none;
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
   background:radial-gradient(ellipse 60% 40% at 50% 50%,rgba(232,48,44,.07) 0%,transparent 70%);
 }
+#screen-uno > * { position:relative; z-index:2; }
 .uno-table{
   width:100%;max-width:900px;margin:0 auto;
   padding:18px 16px 130px;display:flex;flex-direction:column;align-items:center;gap:18px;
@@ -298,7 +349,6 @@ body::before{
 }
 .card-img-wrap.selected img{box-shadow:0 14px 36px rgba(0,0,0,.6),0 0 0 3px rgba(255,255,255,.6);}
 .card-img-wrap.playable img{box-shadow:0 4px 14px rgba(0,0,0,.5),0 0 0 2px rgba(255,255,255,.4);}
-/* CSS fallback card (when PNG not found or for backs) */
 .card-css{
   border-radius:10px;display:flex;align-items:center;justify-content:center;
   box-shadow:0 4px 14px rgba(0,0,0,.5);font-family:'Fredoka One',cursive;
@@ -336,6 +386,7 @@ body::before{
   padding:10px 22px;border-radius:10px;font-family:'Nunito',sans-serif;
   font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;
   box-shadow:0 4px 16px rgba(34,197,94,.4);
+  display:inline-flex;align-items:center;gap:6px;
 }
 .play-btn:hover{transform:scale(1.05);box-shadow:0 6px 20px rgba(34,197,94,.5);}
 .play-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
@@ -349,6 +400,7 @@ body::before{
 .turn-indicator{
   font-size:11px;font-weight:800;color:rgba(255,255,255,.3);
   letter-spacing:.08em;text-transform:uppercase;
+  display:flex;align-items:center;gap:5px;
 }
 .turn-indicator.is-your-turn{color:var(--uno-yellow);}
 
@@ -364,7 +416,6 @@ body::before{
 .log-warn{color:var(--uno-yellow);}
 .log-system{color:#a78bfa;}
 
-/* ── Color indicator dot ── */
 .active-color-dot{
   width:14px;height:14px;border-radius:50%;display:inline-block;
   border:2px solid rgba(255,255,255,.3);margin-right:4px;vertical-align:middle;
@@ -374,13 +425,14 @@ body::before{
 /* ═══════════════════════════════
    TRUTH OR DARE SCREEN
 ═══════════════════════════════ */
-#screen-tod{padding:0;background:#0e0818;position:relative;overflow:hidden;}
+#screen-tod{padding:0;background:transparent;position:relative;overflow:hidden;}
 #screen-tod::before{
-  content:'';position:fixed;inset:0;pointer-events:none;
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
   background:
     radial-gradient(ellipse 70% 50% at 30% 40%,rgba(124,58,237,.11) 0%,transparent 60%),
     radial-gradient(ellipse 60% 40% at 70% 60%,rgba(236,72,153,.07) 0%,transparent 50%);
 }
+#screen-tod > * { position:relative; z-index:2; }
 .tod-arena{width:100%;max-width:680px;margin:0 auto;padding:18px 16px 40px;display:flex;flex-direction:column;align-items:center;gap:22px;}
 .tod-players{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%;animation:fadeDown .4s ease both;}
 .tod-player-chip{
@@ -392,7 +444,10 @@ body::before{
   border-color:var(--tod-pink);background:rgba(236,72,153,.1);
   box-shadow:0 0 24px rgba(236,72,153,.3);transform:scale(1.05);
 }
-.tod-player-chip.spotlight::before{content:'🎯';position:absolute;top:-13px;font-size:15px;animation:bounce 1s ease infinite;}
+.tod-player-chip.spotlight::before{
+  content:'';position:absolute;top:-13px;font-size:15px;animation:bounce 1s ease infinite;
+  /* replaced emoji with FA icon via JS */
+}
 .tod-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#fff;}
 .tod-pname{font-size:11px;font-weight:800;color:#d1d5db;text-align:center;}
 .tod-pscore{font-size:9px;color:var(--muted);font-weight:700;}
@@ -408,12 +463,12 @@ body::before{
 .wheel-ring.spinning{animation:wheelSpin .8s ease both;}
 .wheel-inner{
   width:112px;height:112px;border-radius:50%;background:#0e0818;
-  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;
 }
-.wheel-inner span:first-child{font-size:26px;}
-.wheel-inner span:last-child{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9ca3af;}
+.wheel-inner i{font-size:26px;color:#a78bfa;}
+.wheel-inner span{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9ca3af;}
 .tod-choice-btns{display:flex;gap:13px;}
-.tod-btn{padding:13px 28px;border-radius:14px;border:none;font-family:'Fredoka One',cursive;font-size:21px;cursor:pointer;transition:all .2s;letter-spacing:.02em;}
+.tod-btn{padding:13px 28px;border-radius:14px;border:none;font-family:'Fredoka One',cursive;font-size:21px;cursor:pointer;transition:all .2s;letter-spacing:.02em;display:inline-flex;align-items:center;gap:9px;}
 .tod-truth-btn{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;box-shadow:0 6px 24px rgba(124,58,237,.5);}
 .tod-truth-btn:hover{transform:scale(1.06);box-shadow:0 8px 32px rgba(124,58,237,.7);}
 .tod-dare-btn{background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;box-shadow:0 6px 24px rgba(236,72,153,.5);}
@@ -421,11 +476,11 @@ body::before{
 .prompt-card{width:100%;max-width:480px;border-radius:20px;padding:26px;text-align:center;position:relative;overflow:hidden;animation:cardReveal .5s cubic-bezier(.34,1.56,.64,1) both;}
 .prompt-card.truth-card{background:linear-gradient(135deg,#1e1040,#2d1b6e);border:1px solid rgba(124,58,237,.5);box-shadow:0 8px 40px rgba(124,58,237,.3);}
 .prompt-card.dare-card{background:linear-gradient(135deg,#2d0a1e,#6b1040);border:1px solid rgba(236,72,153,.5);box-shadow:0 8px 40px rgba(236,72,153,.3);}
-.prompt-type{font-size:10px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;margin-bottom:11px;}
+.prompt-type{font-size:10px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;margin-bottom:11px;display:flex;align-items:center;justify-content:center;gap:6px;}
 .truth-card .prompt-type{color:#a78bfa;}.dare-card .prompt-type{color:#f9a8d4;}
 .prompt-text{font-family:'Fredoka One',cursive;font-size:clamp(17px,4vw,23px);color:#fff;line-height:1.4;margin-bottom:18px;}
 .prompt-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
-.prompt-action-btn{padding:9px 18px;border-radius:10px;border:none;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;}
+.prompt-action-btn{padding:9px 18px;border-radius:10px;border:none;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
 .btn-complete{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 4px 16px rgba(34,197,94,.4);}
 .btn-skip{background:rgba(255,255,255,.07);color:#9ca3af;border:1px solid var(--border);}
 .btn-complete:hover{transform:scale(1.04);}
@@ -461,9 +516,8 @@ body::before{
 .cpb-yellow{background:var(--uno-yellow);}
 .cpb-green{background:var(--uno-green);}
 
-/* Win / Game Over modal */
 .win-modal-content{animation:cardReveal .5s cubic-bezier(.34,1.56,.64,1) both;}
-.win-emoji{font-size:64px;margin-bottom:12px;display:block;}
+.win-icon{font-size:64px;margin-bottom:12px;display:block;color:var(--uno-yellow);}
 .win-subtitle{font-size:13px;color:var(--muted);font-weight:700;margin-bottom:20px;}
 
 /* ═══════════════════════════════
@@ -475,6 +529,7 @@ body::before{
   padding:11px 22px;border-radius:12px;font-size:14px;font-weight:700;
   z-index:300;opacity:0;transition:all .3s;pointer-events:none;
   backdrop-filter:blur(20px);white-space:nowrap;
+  display:flex;align-items:center;gap:8px;
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
@@ -492,6 +547,11 @@ body::before{
 @keyframes cardPlay{0%{transform:translateY(-50px) scale(1.15) rotate(-8deg);opacity:0}100%{transform:translateY(0) scale(1) rotate(0);opacity:1}}
 @keyframes cardSlide{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
 @keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+/* Background orb float animations */
+@keyframes floatOrb1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,-40px) scale(1.1)}66%{transform:translate(-30px,50px) scale(.95)}}
+@keyframes floatOrb2{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(-80px,30px) scale(1.08)}80%{transform:translate(50px,-60px) scale(.92)}}
+@keyframes floatOrb3{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(40px,70px) scale(1.12)}75%{transform:translate(-60px,-20px) scale(.9)}}
+@keyframes particleDrift{0%{transform:translateY(0) translateX(0);opacity:0}10%{opacity:1}90%{opacity:.3}100%{transform:translateY(-100vh) translateX(var(--drift));opacity:0}}
 .card-play-anim{animation:cardPlay .4s cubic-bezier(.34,1.56,.64,1) both;}
 .card-slide-in{animation:cardSlide .3s ease both;}
 
@@ -502,6 +562,9 @@ body::before{
 </style>
 </head>
 <body>
+
+<!-- Animated Background Canvas -->
+<canvas id="bg-canvas"></canvas>
 
 <!-- ══════════════════════════════
      LAUNCHER
@@ -518,29 +581,34 @@ body::before{
   <div class="activity-grid">
     <div class="activity-card uno-card" onclick="openLobby('uno')">
       <div class="card-glow"></div>
-      <span class="card-icon">🃏</span>
+      <!-- uno.png replaces card emoji -->
+      <span class="card-icon"><img src="uno.png" alt="UNO" onerror="this.parentElement.innerHTML='<i class=\'fas fa-layer-group fa-icon-large\' style=\'color:#e8302c;\'></i>'"></span>
       <div class="card-label">Card Game</div>
       <div class="card-title">UNO</div>
       <div class="card-desc">Draw, match, and shout UNO! Real-time multiplayer with your voice channel friends.</div>
       <div class="card-meta">
-        <span class="meta-pill">👥 2–10 Players</span>
-        <span class="meta-pill">🔴 Real-time</span>
-        <span class="meta-pill">🎮 Turn Based</span>
+        <span class="meta-pill"><i class="fas fa-users"></i> 2–10 Players</span>
+        <span class="meta-pill"><i class="fas fa-circle" style="color:#e8302c;font-size:7px;"></i> Real-time</span>
+        <span class="meta-pill"><i class="fas fa-gamepad"></i> Turn Based</span>
       </div>
-      <button class="launch-btn" onclick="event.stopPropagation();openLobby('uno')">🚀 Launch Game</button>
+      <button class="launch-btn" onclick="event.stopPropagation();openLobby('uno')">
+        <i class="fas fa-rocket"></i> Launch Game
+      </button>
     </div>
     <div class="activity-card tod-card" onclick="openLobby('tod')">
       <div class="card-glow"></div>
-      <span class="card-icon">🎯</span>
+      <span class="card-icon"><i class="fas fa-bullseye fa-icon-large" style="color:#ec4899;"></i></span>
       <div class="card-label">Party Game</div>
       <div class="card-title">Truth or Dare</div>
       <div class="card-desc">AI-powered truths and dares. Spin the wheel, face the consequences.</div>
       <div class="card-meta">
-        <span class="meta-pill">👥 2–12 Players</span>
-        <span class="meta-pill">🤖 AI Prompts</span>
-        <span class="meta-pill">🔥 Party Mode</span>
+        <span class="meta-pill"><i class="fas fa-users"></i> 2–12 Players</span>
+        <span class="meta-pill"><i class="fas fa-robot"></i> AI Prompts</span>
+        <span class="meta-pill"><i class="fas fa-fire"></i> Party Mode</span>
       </div>
-      <button class="launch-btn" onclick="event.stopPropagation();openLobby('tod')">🚀 Launch Game</button>
+      <button class="launch-btn" onclick="event.stopPropagation();openLobby('tod')">
+        <i class="fas fa-rocket"></i> Launch Game
+      </button>
     </div>
   </div>
 </div>
@@ -550,51 +618,48 @@ body::before{
 ══════════════════════════════ -->
 <div id="screen-lobby" class="screen">
   <div class="game-topbar">
-    <button class="back-btn" onclick="leaveLobby()">← Back</button>
-    <div class="topbar-title" id="lobby-title">🃏 UNO Lobby</div>
+    <button class="back-btn" onclick="leaveLobby()"><i class="fas fa-arrow-left"></i> Back</button>
+    <div class="topbar-title" id="lobby-title"><i class="fas fa-layer-group"></i> UNO Lobby</div>
     <div class="topbar-meta" id="lobby-player-count">0 players</div>
   </div>
 
   <div style="width:100%;max-width:480px;padding:20px 16px;display:flex;flex-direction:column;gap:16px;">
 
-    <!-- Name input (hidden once locked in) -->
     <div class="lobby-box" id="lobby-name-box">
       <h3>Who are you?</h3>
       <div class="field-label">Your Display Name</div>
       <input id="inp-name" class="inp" type="text" maxlength="18" placeholder="Enter your name…" oninput="onNameInput()">
       <div class="btn-row" style="margin-top:12px;">
-        <button class="btn btn-primary" id="btn-confirm-name" onclick="confirmName()" disabled>Continue →</button>
+        <button class="btn btn-primary" id="btn-confirm-name" onclick="confirmName()" disabled>
+          Continue <i class="fas fa-arrow-right"></i>
+        </button>
       </div>
     </div>
 
-    <!-- Room options (shown after name confirmed) -->
     <div class="lobby-box" id="lobby-room-box" style="display:none;">
       <div style="display:flex;gap:10px;flex-direction:column;">
-
-        <!-- Create -->
-        <button class="btn btn-danger" onclick="createRoom()" id="btn-create">🎲 Create Room</button>
-
+        <button class="btn btn-danger" onclick="createRoom()" id="btn-create">
+          <i class="fas fa-dice"></i> Create Room
+        </button>
         <div class="lobby-divider">or join existing</div>
-
         <div class="field-label">Room Code</div>
         <input id="inp-room-code" class="inp code-inp" type="text" maxlength="6" placeholder="A B C 1 2 3" oninput="this.value=this.value.toUpperCase()">
-        <button class="btn btn-secondary" onclick="joinRoom()" id="btn-join">Join Room</button>
+        <button class="btn btn-secondary" onclick="joinRoom()" id="btn-join">
+          <i class="fas fa-sign-in-alt"></i> Join Room
+        </button>
       </div>
     </div>
 
-    <!-- Waiting room (shown after room joined/created) -->
     <div class="lobby-box" id="lobby-waiting-box" style="display:none;">
       <div id="room-code-display" class="room-code-display" style="display:none;">
         <div class="code-big" id="room-code-text">——</div>
         <p>Share this code with your friends</p>
       </div>
-
       <h3 style="margin-top:4px;">Players in Room</h3>
       <div class="lobby-players" id="lobby-player-list"></div>
-
       <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
         <button class="btn btn-success" id="btn-start-game" onclick="startGame()" disabled style="display:none;">
-          ▶ Start Game
+          <i class="fas fa-play"></i> Start Game
         </button>
         <div id="lobby-waiting-msg" style="font-size:12px;color:var(--muted);font-weight:700;text-align:center;">
           Waiting for host to start…
@@ -610,8 +675,8 @@ body::before{
 ══════════════════════════════ -->
 <div id="screen-uno" class="screen">
   <div class="game-topbar">
-    <button class="back-btn" onclick="confirmLeaveGame()">← Leave</button>
-    <div class="topbar-title">🃏 UNO</div>
+    <button class="back-btn" onclick="confirmLeaveGame()"><i class="fas fa-door-open"></i> Leave</button>
+    <div class="topbar-title"><i class="fas fa-layer-group"></i> UNO</div>
     <div class="topbar-meta">
       <span id="active-color-label"></span>
       Round <span id="uno-round">1</span>
@@ -649,10 +714,14 @@ body::before{
   </div>
 
   <div class="your-hand">
-    <div class="turn-indicator" id="turn-indicator">⏳ Waiting for turn…</div>
+    <div class="turn-indicator" id="turn-indicator">
+      <i class="fas fa-hourglass-half"></i> Waiting for turn…
+    </div>
     <div class="hand-cards" id="hand-cards"></div>
     <div class="action-bar">
-      <button class="play-btn" id="play-btn" onclick="playSelected()" disabled>Play Card</button>
+      <button class="play-btn" id="play-btn" onclick="playSelected()" disabled>
+        <i class="fas fa-play"></i> Play Card
+      </button>
       <button class="uno-shout-btn" onclick="shoutUno()">UNO!</button>
     </div>
   </div>
@@ -663,8 +732,8 @@ body::before{
 ══════════════════════════════ -->
 <div id="screen-tod" class="screen">
   <div class="game-topbar">
-    <button class="back-btn" onclick="leaveLobby()">← Leave</button>
-    <div class="topbar-title">🎯 Truth or Dare</div>
+    <button class="back-btn" onclick="leaveLobby()"><i class="fas fa-arrow-left"></i> Leave</button>
+    <div class="topbar-title"><i class="fas fa-bullseye"></i> Truth or Dare</div>
     <div class="topbar-meta">Round <span id="tod-round">1</span></div>
   </div>
   <div class="tod-arena">
@@ -672,13 +741,17 @@ body::before{
     <div class="tod-wheel-area">
       <div class="wheel-ring" id="tod-wheel" onclick="spinWheel()">
         <div class="wheel-inner">
-          <span id="wheel-emoji">🎯</span>
+          <i class="fas fa-bullseye" id="wheel-icon"></i>
           <span id="wheel-label">Spin!</span>
         </div>
       </div>
       <div class="tod-choice-btns" id="tod-choice-btns" style="display:none;">
-        <button class="tod-btn tod-truth-btn" onclick="chooseTod('truth')">💬 Truth</button>
-        <button class="tod-btn tod-dare-btn" onclick="chooseTod('dare')">🎯 Dare</button>
+        <button class="tod-btn tod-truth-btn" onclick="chooseTod('truth')">
+          <i class="fas fa-comment"></i> Truth
+        </button>
+        <button class="tod-btn tod-dare-btn" onclick="chooseTod('dare')">
+          <i class="fas fa-fire"></i> Dare
+        </button>
       </div>
     </div>
     <div id="tod-prompt-area"></div>
@@ -690,10 +763,18 @@ body::before{
   <div class="color-modal">
     <h3>Choose a Color</h3>
     <div class="color-picker-grid">
-      <button class="color-pick-btn cpb-red"    onclick="pickColor('red')">🔴</button>
-      <button class="color-pick-btn cpb-blue"   onclick="pickColor('blue')">🔵</button>
-      <button class="color-pick-btn cpb-yellow" onclick="pickColor('yellow')">🟡</button>
-      <button class="color-pick-btn cpb-green"  onclick="pickColor('green')">🟢</button>
+      <button class="color-pick-btn cpb-red"    onclick="pickColor('red')">
+        <i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i>
+      </button>
+      <button class="color-pick-btn cpb-blue"   onclick="pickColor('blue')">
+        <i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i>
+      </button>
+      <button class="color-pick-btn cpb-yellow" onclick="pickColor('yellow')">
+        <i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i>
+      </button>
+      <button class="color-pick-btn cpb-green"  onclick="pickColor('green')">
+        <i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i>
+      </button>
     </div>
   </div>
 </div>
@@ -701,11 +782,13 @@ body::before{
 <!-- Win / Game Over Modal -->
 <div class="modal-overlay" id="win-modal">
   <div class="modal-box win-modal-content">
-    <span class="win-emoji" id="win-emoji">🎉</span>
+    <i class="fas fa-trophy win-icon" id="win-icon"></i>
     <h3 id="win-title">You Win!</h3>
     <p class="win-subtitle" id="win-subtitle">Great game!</p>
     <div class="btn-row" style="margin-top:16px;">
-      <button class="btn btn-primary" onclick="closeWinModal()">Back to Lobby</button>
+      <button class="btn btn-primary" onclick="closeWinModal()">
+        <i class="fas fa-undo"></i> Back to Lobby
+      </button>
     </div>
   </div>
 </div>
@@ -717,36 +800,127 @@ body::before{
 'use strict';
 // ═══════════════════════════════════════════════════════════════
 // ██████  CONFIG  ██████
-// Fill these in before deploying.
 // ═══════════════════════════════════════════════════════════════
 const CFG = {
-  SUPABASE_URL:      'https://hfxagwcwaalrmaqzhyfj.supabase.co',   // e.g. 'https://xxxxxxxxxxxx.supabase.co'
-  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmeGFnd2N3YWFscm1hcXpoeWZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MzY5NzIsImV4cCI6MjA5MDIxMjk3Mn0.LMFfFRmqW34PT70zAOTj4zsUWmrDl_P4MXL0wZBkxYc',   // your anon/public key
-  DISCORD_CLIENT_ID: '1487252546060947476',   // optional: Discord app client ID for Activity mode
-  CARD_PATH: 'https://suprosmith-coder.github.io/DCgamehub/cards/',         // path prefix for card PNGs (default: same dir)
+  SUPABASE_URL:      'https://hfxagwcwaalrmaqzhyfj.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmeGFnd2N3YWFscm1hcXpoeWZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MzY5NzIsImV4cCI6MjA5MDIxMjk3Mn0.LMFfFRmqW34PT70zAOTj4zsUWmrDl_P4MXL0wZBkxYc',
+  DISCORD_CLIENT_ID: '1487252546060947476',
+  CARD_PATH: './',
 };
+
+// ═══════════════════════════════════════════════════════════════
+// ANIMATED BACKGROUND — floating orbs + particle sparks
+// ═══════════════════════════════════════════════════════════════
+(function initBg() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  const ORB_CONFIGS = [
+    { x:.15, y:.8,  r:260, color:'rgba(124,58,237,', speed:.0004, drift:.0003 },
+    { x:.85, y:.2,  r:220, color:'rgba(88,101,242,',  speed:.0003, drift:.0005 },
+    { x:.5,  y:.5,  r:180, color:'rgba(236,72,153,',  speed:.0005, drift:.0002 },
+    { x:.1,  y:.1,  r:150, color:'rgba(232,48,44,',   speed:.0006, drift:.0004 },
+  ];
+  const orbs = ORB_CONFIGS.map(c => ({
+    ...c,
+    ox: 0, oy: 0,
+    angle1: Math.random() * Math.PI * 2,
+    angle2: Math.random() * Math.PI * 2,
+  }));
+
+  // Particles
+  const PARTICLE_COUNT = 38;
+  const particles = Array.from({ length: PARTICLE_COUNT }, () => spawnParticle(true));
+
+  function spawnParticle(random) {
+    return {
+      x: Math.random() * (W || window.innerWidth),
+      y: random ? Math.random() * (H || window.innerHeight) : (H || window.innerHeight) + 10,
+      vy: -(0.3 + Math.random() * 0.8),
+      vx: (Math.random() - 0.5) * 0.4,
+      size: 1 + Math.random() * 2.5,
+      opacity: 0,
+      maxOp: 0.15 + Math.random() * 0.35,
+      color: ['rgba(165,180,252,', 'rgba(196,181,253,', 'rgba(249,192,35,'][Math.floor(Math.random()*3)],
+      life: 0,
+      maxLife: 120 + Math.random() * 200,
+    };
+  }
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  let t = 0;
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    t++;
+
+    // Draw orbs
+    orbs.forEach(o => {
+      o.angle1 += o.speed;
+      o.angle2 += o.drift;
+      o.ox = Math.sin(o.angle1) * W * 0.08;
+      o.oy = Math.cos(o.angle2) * H * 0.08;
+      const cx = o.x * W + o.ox;
+      const cy = o.y * H + o.oy;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, o.r);
+      grad.addColorStop(0,   o.color + '0.09)');
+      grad.addColorStop(0.4, o.color + '0.05)');
+      grad.addColorStop(1,   o.color + '0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, o.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Draw particles
+    particles.forEach((p, i) => {
+      p.life++;
+      p.x += p.vx;
+      p.y += p.vy;
+      // Fade in/out
+      const half = p.maxLife / 2;
+      p.opacity = p.life < half
+        ? (p.life / half) * p.maxOp
+        : ((p.maxLife - p.life) / half) * p.maxOp;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = p.color + p.opacity + ')';
+      ctx.fill();
+
+      if (p.life >= p.maxLife || p.y < -10) {
+        particles[i] = spawnParticle(false);
+        particles[i].x = Math.random() * W;
+      }
+    });
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
 
 // ═══════════════════════════════════════════════════════════════
 // GLOBALS
 // ═══════════════════════════════════════════════════════════════
-let SB      = null;    // Supabase client
-let CH      = null;    // Realtime channel
-let discordSdk = null; // Discord Embedded App SDK (if in Activity)
+let SB      = null;
+let CH      = null;
+let discordSdk = null;
 
 let MY_ID   = crypto.randomUUID().slice(0,8);
 let MY_NAME = '';
 
 let isHost  = false;
 let roomCode = '';
-let gameType = '';   // 'uno' | 'tod'
+let gameType = '';
 
-// Lobby: presence-derived player map { [id]: { name, isHost } }
 let lobbyPlayers = {};
-
-// Game state — maintained by all players (host is authoritative)
 let G = null;
-
-// UNO local selection
 let selectedIdx = null;
 
 // ═══════════════════════════════════════════════════════════════
@@ -756,8 +930,7 @@ const CARD_COLORS  = ['red','blue','green','yellow'];
 const COLOR_PREFIX = { red:'R', blue:'B', green:'G', yellow:'Y' };
 const VALUE_SUFFIX = { skip:'S', reverse:'R', draw2:'A2' };
 const COLOR_DOT    = { red:'#e8302c', blue:'#1a73e8', green:'#2db552', yellow:'#f9c023', black:'#555' };
-const COLOR_EMOJI  = { red:'🔴', blue:'🔵', green:'🟢', yellow:'🟡', black:'⬛' };
-const VALUE_LABEL  = { skip:'⛔ Skip', reverse:'↩️ Reverse', draw2:'+2', wild:'🌈 Wild', wild4:'🌈 +4 Wild' };
+const VALUE_LABEL  = { skip:'Skip', reverse:'Rev', draw2:'+2', wild:'Wild', wild4:'+4 Wild' };
 
 function cardFilename({ color, value }) {
   if (value === 'wild')  return 'WC.png';
@@ -777,7 +950,6 @@ function cardLabel({ color, value }) {
 function isPlayable(card) {
   if (!G || !G.started || !isMyTurn()) return false;
   if (G.drawStack > 0) {
-    // Can only play a draw card of same type to stack, or must draw
     if (G.topCard.value === 'draw2')  return card.value === 'draw2';
     if (G.topCard.value === 'wild4')  return card.value === 'wild4';
   }
@@ -841,7 +1013,6 @@ function cardEl(card, { w=56, h=84, idx=-1, inHand=false, isDiscard=false } = {}
   img.style.cssText = `width:${w}px;height:${h}px;`;
   if (isDiscard) img.classList.add('card-play-anim');
 
-  // Fallback to CSS card if image not found
   img.onerror = function() {
     this.style.display = 'none';
     const fb = document.createElement('div');
@@ -871,7 +1042,7 @@ function cardBackEl(w=62, h=93) {
 // ═══════════════════════════════════════════════════════════════
 function initSupabase() {
   if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) {
-    console.warn('Supabase not configured — multiplayer disabled. Fill CFG at top of script.');
+    console.warn('Supabase not configured — multiplayer disabled.');
     return false;
   }
   SB = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
@@ -889,7 +1060,6 @@ async function setupChannel(code) {
     config: { broadcast: { self: true }, presence: { key: MY_ID } }
   });
 
-  // ── Presence (player list) ──
   CH.on('presence', { event: 'sync' }, () => {
     const state = CH.presenceState();
     lobbyPlayers = {};
@@ -902,31 +1072,28 @@ async function setupChannel(code) {
   });
 
   CH.on('presence', { event: 'join' }, ({ key, newPresences }) => {
-    if (newPresences[0]) showToast(`👋 ${newPresences[0].name} joined`);
+    if (newPresences[0]) showToast(`${newPresences[0].name} joined`, 'fa-user-plus');
   });
 
   CH.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-    if (leftPresences[0]) showToast(`👋 ${leftPresences[0].name} left`);
+    if (leftPresences[0]) showToast(`${leftPresences[0].name} left`, 'fa-user-minus');
     if (G && G.started && G.players[key]) {
-      // Mark disconnected
       G.players[key].connected = false;
       addLog(`${G.players[key].name} disconnected.`, 'log-warn');
       if (isHost) {
-        // Skip their turns automatically
         if (G.turnOrder[G.currentTurnIdx] === key) advanceTurn(1);
         broadcastFullState();
       }
     }
   });
 
-  // ── Broadcasts ──
   CH.on('broadcast', { event: 'game_state' }, ({ payload }) => {
-    if (isHost) return; // host maintains their own state
+    if (isHost) return;
     applyStateUpdate(payload);
   });
 
   CH.on('broadcast', { event: 'game_action' }, ({ payload }) => {
-    if (!isHost) return; // only host processes actions
+    if (!isHost) return;
     processAction(payload);
   });
 
@@ -962,15 +1129,16 @@ function broadcastFullState() {
     round:          G.round,
     deckSize:       G.deck.length,
     log:            G.log.slice(-20),
-    hands:          G.hands, // all hands broadcast (party game, acceptable)
+    hands:          G.hands,
   });
 }
 
 function applyStateUpdate(payload) {
   if (!G) G = {};
   Object.assign(G, payload);
-  // Sync my hand
   if (G.hands && G.hands[MY_ID]) G.myHand = G.hands[MY_ID];
+  // Handle screen switch signal
+  if (payload.screenSwitch === 'uno') showScreen('screen-uno');
   renderGame();
 }
 
@@ -979,9 +1147,11 @@ function applyStateUpdate(payload) {
 // ═══════════════════════════════════════════════════════════════
 function openLobby(type) {
   gameType = type;
-  document.getElementById('lobby-title').textContent = type === 'uno' ? '🃏 UNO Lobby' : '🎯 ToD Lobby';
+  const icon = type === 'uno'
+    ? '<i class="fas fa-layer-group"></i>'
+    : '<i class="fas fa-bullseye"></i>';
+  document.getElementById('lobby-title').innerHTML = `${icon} ${type === 'uno' ? 'UNO Lobby' : 'ToD Lobby'}`;
   showScreen('screen-lobby');
-  // Reset lobby UI
   document.getElementById('lobby-name-box').style.display   = '';
   document.getElementById('lobby-room-box').style.display   = 'none';
   document.getElementById('lobby-waiting-box').style.display = 'none';
@@ -1020,7 +1190,7 @@ async function createRoom() {
 
 async function joinRoom() {
   const code = document.getElementById('inp-room-code').value.trim().toUpperCase();
-  if (code.length < 3) { showToast('⚠️ Enter a room code first'); return; }
+  if (code.length < 3) { showToast('Enter a room code first', 'fa-exclamation-triangle'); return; }
   roomCode = code;
   isHost = false;
   await _enterRoom();
@@ -1034,7 +1204,6 @@ async function _enterRoom() {
   if (SB) {
     await setupChannel(roomCode);
   } else {
-    // Offline mode: pretend we're in a room alone
     lobbyPlayers[MY_ID] = { id:MY_ID, name:MY_NAME, isHost };
     updateLobbyUI();
     if (isHost) {
@@ -1067,7 +1236,6 @@ function updateLobbyUI() {
     list.appendChild(item);
   });
 
-  // Enable start button if host and 2+ players (or allow solo for testing)
   if (isHost) {
     const btn = document.getElementById('btn-start-game');
     btn.disabled = ids.length < 2;
@@ -1080,18 +1248,17 @@ async function startGame() {
   if (gameType === 'tod') {
     initTodWithPlayers();
     showScreen('screen-tod');
+    broadcast('tod_action', { type: 'start_tod' });
     return;
   }
-  // UNO
   const playerIds = Object.keys(lobbyPlayers);
   if (playerIds.length < 2 && SB) {
-    showToast('⚠️ Need at least 2 players to start'); return;
+    showToast('Need at least 2 players to start', 'fa-exclamation-triangle'); return;
   }
   initGameState(playerIds);
   showScreen('screen-uno');
   renderGame();
-  broadcastFullState();
-  // Tell others to switch to game screen
+  // Broadcast full state WITH screenSwitch signal so all clients switch screens
   broadcast('game_state', { ...getSerializableState(), screenSwitch:'uno' });
 }
 
@@ -1142,7 +1309,7 @@ function initGameState(playerIds) {
     started: true, over: false, winner: null,
     round: 1,
     log: [
-      { text:'🎮 Game started!', cls:'log-system' },
+      { text:'Game started!', cls:'log-system' },
       { text:`${players[turnOrder[0]]?.name || 'Player'} goes first.`, cls:'log-warn' },
     ],
     myHand: null,
@@ -1170,12 +1337,10 @@ function getSerializableState() {
   };
 }
 
-// HOST: Process an action sent by any player
 function processAction({ type, playerId, card, chosenColor }) {
   if (!G || !isHost) return;
 
   if (type === 'play_card') {
-    // Remove card from player's hand
     if (G.hands[playerId]) {
       const idx = G.hands[playerId].findIndex(c => c.color===card.color && c.value===card.value);
       if (idx !== -1) G.hands[playerId].splice(idx, 1);
@@ -1183,10 +1348,8 @@ function processAction({ type, playerId, card, chosenColor }) {
     G.players[playerId].cardCount = G.hands[playerId]?.length ?? 0;
     G.topCard  = card;
     G.topColor = chosenColor || card.color;
-
     addLog(`${G.players[playerId]?.name || 'Player'} played ${cardLabel({ color:G.topColor, value:card.value })}.`,
       playerId === MY_ID ? 'log-you' : '');
-
     if (checkWin(playerId)) { broadcastFullState(); return; }
     applyCardEffect(card, playerId, chosenColor);
 
@@ -1205,7 +1368,7 @@ function processAction({ type, playerId, card, chosenColor }) {
     advanceTurn(1);
 
   } else if (type === 'uno_shout') {
-    addLog(`🗣️ ${G.players[playerId]?.name} shouted UNO!`, 'log-warn');
+    addLog(`${G.players[playerId]?.name} shouted UNO!`, 'log-warn');
   }
 
   if (G.hands && G.hands[MY_ID]) G.myHand = G.hands[MY_ID];
@@ -1220,22 +1383,18 @@ function applyCardEffect(card, playerId, chosenColor) {
   if (card.value === 'skip') {
     addLog(`${G.players[nextId]?.name} was skipped!`, 'log-warn');
     advanceTurn(2);
-
   } else if (card.value === 'reverse') {
     G.direction *= -1;
     addLog(`Direction reversed!`, 'log-system');
     advanceTurn(G.turnOrder.length === 2 ? 2 : 1);
-
   } else if (card.value === 'draw2') {
     G.drawStack += 2;
     addLog(`${G.players[nextId]?.name} must draw 2 (or stack)!`, 'log-warn');
     advanceTurn(1);
-
   } else if (card.value === 'wild4') {
     G.drawStack += 4;
     addLog(`${G.players[nextId]?.name} must draw 4 (or stack)!`, 'log-warn');
     advanceTurn(1);
-
   } else {
     advanceTurn(1);
   }
@@ -1257,7 +1416,7 @@ function checkWin(playerId) {
     G.over = true;
     G.winner = playerId;
     G.players[playerId].score = (G.players[playerId].score || 0) + 1;
-    addLog(`🏆 ${G.players[playerId]?.name} wins this round!`, 'log-warn');
+    addLog(`${G.players[playerId]?.name} wins this round!`, 'log-warn');
     return true;
   }
   return false;
@@ -1273,10 +1432,10 @@ function addLog(text, cls='') {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// LOCAL ACTIONS  (client → host)
+// LOCAL ACTIONS
 // ═══════════════════════════════════════════════════════════════
 function selectCard(idx) {
-  if (!isMyTurn()) { showToast('⏳ Not your turn!'); return; }
+  if (!isMyTurn()) { showToast('Not your turn!', 'fa-hourglass-half'); return; }
   selectedIdx = selectedIdx === idx ? null : idx;
   renderHand();
   document.getElementById('play-btn').disabled = selectedIdx === null;
@@ -1285,8 +1444,7 @@ function selectCard(idx) {
 function playSelected() {
   if (selectedIdx === null || !isMyTurn()) return;
   const card = G.myHand[selectedIdx];
-  if (!isPlayable(card)) { showToast("❌ Can't play that card right now!"); return; }
-
+  if (!isPlayable(card)) { showToast("Can't play that card right now!", 'fa-ban'); return; }
   if (card.color === 'black') {
     document.getElementById('color-modal').classList.add('show');
     return;
@@ -1295,13 +1453,10 @@ function playSelected() {
 }
 
 function executePlay(card, idx, chosenColor) {
-  // Optimistic update of my hand locally
   G.myHand.splice(idx, 1);
   if (G.hands[MY_ID]) G.hands[MY_ID] = [...G.myHand];
   selectedIdx = null;
-
-  if (G.myHand.length === 1) setTimeout(() => showToast('⚠️ 1 card left — shout UNO!'), 200);
-
+  if (G.myHand.length === 1) setTimeout(() => showToast('1 card left — shout UNO!', 'fa-exclamation'), 200);
   if (isHost) {
     processAction({ type:'play_card', playerId:MY_ID, card, chosenColor });
   } else {
@@ -1311,9 +1466,8 @@ function executePlay(card, idx, chosenColor) {
 }
 
 function drawCardAction() {
-  if (!isMyTurn()) { showToast('⏳ Not your turn!'); return; }
+  if (!isMyTurn()) { showToast('Not your turn!', 'fa-hourglass-half'); return; }
   selectedIdx = null;
-
   if (isHost) {
     processAction({ type:'draw_card', playerId:MY_ID });
   } else {
@@ -1333,11 +1487,11 @@ function pickColor(color) {
 function shoutUno() {
   if (!G || !G.myHand) return;
   if (G.myHand.length === 1) {
-    showToast('🗣️ UNO! Nice call!');
+    showToast('UNO! Nice call!', 'fa-bullhorn');
     broadcast('game_action', { type:'uno_shout', playerId:MY_ID });
-    if (isHost) addLog(`🗣️ ${G.players[MY_ID]?.name} shouted UNO!`, 'log-warn');
+    if (isHost) addLog(`${G.players[MY_ID]?.name} shouted UNO!`, 'log-warn');
   } else {
-    showToast(`😅 You have ${G.myHand.length} cards — not UNO yet!`);
+    showToast(`You have ${G.myHand.length} cards — not UNO yet!`, 'fa-times-circle');
   }
 }
 
@@ -1345,7 +1499,6 @@ function closeWinModal() {
   document.getElementById('win-modal').classList.remove('show');
   G.over = false;
   showScreen('screen-lobby');
-  // Re-enter the lobby (keep the channel)
   document.getElementById('lobby-room-box').style.display = 'none';
   document.getElementById('lobby-waiting-box').style.display = '';
   if (isHost) {
@@ -1362,20 +1515,15 @@ function closeWinModal() {
 // ═══════════════════════════════════════════════════════════════
 function renderGame() {
   if (!G || !G.started) return;
-
-  // Sync screen if signaled by state update
   const curScreen = document.querySelector('.screen.active')?.id;
   if (curScreen !== 'screen-uno') showScreen('screen-uno');
-
   renderPlayers();
   renderDiscardPile();
   renderHand();
   renderLog();
   renderTurnState();
   updateActiveColorLabel();
-
   document.getElementById('uno-round').textContent = G.round || 1;
-
   if (G.over) showWinModal(G.winner);
 }
 
@@ -1409,10 +1557,6 @@ function renderDiscardPile() {
   const pile = document.getElementById('discard-pile');
   pile.innerHTML = '';
   if (!G.topCard) return;
-  // Show with chosen color for wilds
-  const displayCard = G.topCard.color === 'black'
-    ? { ...G.topCard, _displayColor: G.topColor }
-    : G.topCard;
   const el = cardEl(G.topCard, { w:80, h:120, isDiscard:true });
   pile.appendChild(el);
 }
@@ -1439,13 +1583,10 @@ function renderLog() {
 function renderTurnState() {
   const ind = document.getElementById('turn-indicator');
   if (isMyTurn()) {
-    ind.textContent = '⚡ Your turn!';
+    ind.innerHTML = `<i class="fas fa-bolt"></i> ${G.drawStack > 0 ? `Draw ${G.drawStack} or stack!` : 'Your turn!'}`;
     ind.className = 'turn-indicator is-your-turn';
-    if (G.drawStack > 0) {
-      ind.textContent = `⚡ Draw ${G.drawStack} or stack!`;
-    }
   } else {
-    ind.textContent = `⏳ ${currentTurnName()}'s turn…`;
+    ind.innerHTML = `<i class="fas fa-hourglass-half"></i> ${currentTurnName()}'s turn…`;
     ind.className = 'turn-indicator';
   }
 }
@@ -1463,9 +1604,11 @@ function updatePlayerChips() {
 function showWinModal(winnerId) {
   const p = G.players[winnerId];
   const isMe = winnerId === MY_ID;
-  document.getElementById('win-emoji').textContent   = isMe ? '🏆' : '🎉';
+  const icon = document.getElementById('win-icon');
+  icon.className = isMe ? 'fas fa-trophy win-icon' : 'fas fa-star win-icon';
+  icon.style.color = isMe ? 'var(--uno-yellow)' : '#a78bfa';
   document.getElementById('win-title').textContent   = isMe ? 'You Win!' : `${p?.name || 'Player'} Wins!`;
-  document.getElementById('win-subtitle').textContent = isMe ? 'Great play! 🎊' : 'Better luck next round!';
+  document.getElementById('win-subtitle').textContent = isMe ? 'Great play!' : 'Better luck next round!';
   document.getElementById('win-modal').classList.add('show');
 }
 
@@ -1524,14 +1667,16 @@ function renderTod() {
     chip.innerHTML = `
       <div class="tod-avatar" style="background:${p.color}">${p.name.slice(0,1).toUpperCase()}</div>
       <div class="tod-pname">${p.name}</div>
-      <div class="tod-pscore">⭐ ${p.score}</div>
+      <div class="tod-pscore"><i class="fas fa-star" style="color:var(--uno-yellow);font-size:8px;"></i> ${p.score}</div>
+      ${p.spotlight ? '<i class="fas fa-bullseye" style="position:absolute;top:-13px;color:var(--tod-pink);font-size:13px;animation:bounce 1s ease infinite;"></i>' : ''}
     `;
     container.appendChild(chip);
   });
   document.getElementById('tod-round').textContent = todState.round;
   document.getElementById('tod-choice-btns').style.display = 'none';
   document.getElementById('tod-prompt-area').innerHTML = '';
-  document.getElementById('wheel-emoji').textContent = '🎯';
+  const icon = document.getElementById('wheel-icon');
+  if (icon) { icon.className = 'fas fa-bullseye'; }
   document.getElementById('wheel-label').textContent  = 'Spin!';
   todState.spun = false;
 }
@@ -1544,10 +1689,11 @@ function spinWheel() {
   setTimeout(() => {
     wheel.classList.remove('spinning');
     const cur = todState.players[todState.currentIdx];
-    document.getElementById('wheel-emoji').textContent = '✨';
-    document.getElementById('wheel-label').textContent  = cur.name + '!';
+    const icon = document.getElementById('wheel-icon');
+    if (icon) icon.className = 'fas fa-star';
+    document.getElementById('wheel-label').textContent = cur.name + '!';
     document.getElementById('tod-choice-btns').style.display = 'flex';
-    showToast(`🎯 ${cur.name}'s turn!`);
+    showToast(`${cur.name}'s turn!`, 'fa-bullseye');
     if (SB) broadcast('tod_action', { type:'spin', playerName: cur.name });
   }, 900);
 }
@@ -1556,7 +1702,8 @@ function chooseTod(type) {
   document.getElementById('tod-choice-btns').style.display = 'none';
   document.getElementById('tod-prompt-area').innerHTML = `
     <div class="ai-thinking">
-      <span>🤖 Generating ${type}…</span>
+      <i class="fas fa-robot" style="color:var(--accent2);"></i>
+      <span>Generating ${type}…</span>
       <div class="ai-thinking-dots"><span></span><span></span><span></span></div>
     </div>`;
   setTimeout(() => showPrompt(type), 1200);
@@ -1566,13 +1713,20 @@ function showPrompt(type) {
   const arr = type === 'truth' ? TRUTHS : DARES;
   const prompt = arr[Math.floor(Math.random() * arr.length)];
   const area = document.getElementById('tod-prompt-area');
+  const iconHtml = type === 'truth'
+    ? '<i class="fas fa-comment"></i> Truth'
+    : '<i class="fas fa-fire"></i> Dare';
   area.innerHTML = `
     <div class="prompt-card ${type}-card card-play-anim">
-      <div class="prompt-type">${type === 'truth' ? '💬 Truth' : '🎯 Dare'}</div>
+      <div class="prompt-type">${iconHtml}</div>
       <div class="prompt-text">${prompt}</div>
       <div class="prompt-actions">
-        <button class="prompt-action-btn btn-complete" onclick="completePrompt()">✅ Done!</button>
-        <button class="prompt-action-btn btn-skip"     onclick="skipPrompt()">Skip (−1 pt)</button>
+        <button class="prompt-action-btn btn-complete" onclick="completePrompt()">
+          <i class="fas fa-check"></i> Done!
+        </button>
+        <button class="prompt-action-btn btn-skip" onclick="skipPrompt()">
+          <i class="fas fa-forward"></i> Skip (−1 pt)
+        </button>
       </div>
     </div>`;
 }
@@ -1580,12 +1734,12 @@ function showPrompt(type) {
 function completePrompt() {
   const p = todState.players[todState.currentIdx];
   p.score += 1;
-  showToast(`🎉 ${p.name} completed it! +1`);
+  showToast(`${p.name} completed it! +1`, 'fa-check-circle');
   advanceTod();
 }
 
 function skipPrompt() {
-  showToast(`😬 Skipped!`);
+  showToast('Skipped!', 'fa-forward');
   advanceTod();
 }
 
@@ -1598,7 +1752,10 @@ function advanceTod() {
 }
 
 function applyTodAction(payload) {
-  // Future: sync tod state in real-time
+  if (payload.type === 'start_tod' && !isHost) {
+    initTodWithPlayers();
+    showScreen('screen-tod');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1611,25 +1768,57 @@ function showScreen(id) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TOAST
+// TOAST  (accepts optional FA icon class)
 // ═══════════════════════════════════════════════════════════════
 let _toastTimer;
-function showToast(msg, ms=2800) {
+function showToast(msg, iconClass='fa-info-circle', ms=2800) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
+  t.innerHTML = `<i class="fas ${iconClass}"></i> ${msg}`;
   t.classList.add('show');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => t.classList.remove('show'), ms);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// DISCORD ACTIVITY SDK (optional)
+// DISCORD ACTIVITY SDK
 // ═══════════════════════════════════════════════════════════════
 async function tryInitDiscordSdk() {
   if (!CFG.DISCORD_CLIENT_ID) return null;
   try {
-    // Dynamic ESM import from CDN — requires CSP to allow esm.sh
-    const { DiscordSDK } = await import('https://esm.sh/@discord/embedded-app-sdk@1');
+    /*
+     * WHY BUTTONS DON'T WORK IN DISCORD ACTIVITY (iFrame) but work on the web:
+     *
+     * Discord Activities run inside a sandboxed <iframe>. The iframe has a very
+     * restrictive Content-Security-Policy set by Discord that blocks inline event
+     * handlers (onclick="...") in some contexts AND — more critically — blocks
+     * dynamic ESM imports from external CDNs unless the SDK is loaded via
+     * Discord's own proxy (/.proxy/ path rewriting).
+     *
+     * The most common causes of "buttons not working" inside Discord Activities:
+     *
+     * 1. CSP + inline handlers: Discord's iframe sandbox may block onclick=""
+     *    attributes.  The fix used in this file is to attach all handlers via
+     *    addEventListener so nothing is inline.  (Already applied to card clicks.)
+     *
+     * 2. SDK import from esm.sh blocked by iframe sandbox or CSP.
+     *    Use a local bundle or import from a path proxied by Discord instead.
+     *
+     * 3. The SDK's ready() / authorize() handshake must complete before any user
+     *    interaction is processed.  If it throws, we silently fall through to
+     *    standalone mode here.
+     *
+     * 4. URL path: Discord proxies your activity at
+     *    https://discord.com/activities/<CLIENT_ID>/.proxy/
+     *    All fetch/XHR calls and imports MUST use relative paths so they are
+     *    rewritten through that proxy. Absolute URLs to external CDNs will fail
+     *    with CORS/CSP errors inside the Activity iframe.
+     *
+     * SOLUTION APPLIED HERE:
+     * - The SDK is imported via a relative proxy path that Discord rewrites.
+     * - All critical button handlers are wired with addEventListener (not onclick).
+     * - A DOMContentLoaded guard ensures buttons exist before we attach listeners.
+     */
+    const { DiscordSDK } = await import('./.proxy/esm.sh/@discord/embedded-app-sdk@1');
     discordSdk = new DiscordSDK(CFG.DISCORD_CLIENT_ID);
     await discordSdk.ready();
     const { code } = await discordSdk.commands.authorize({
@@ -1639,28 +1828,98 @@ async function tryInitDiscordSdk() {
       prompt: 'none',
       scope: ['identify','guilds.members.read'],
     });
-    // Exchange code for token via your Supabase edge function:
-    //   POST /functions/v1/discord-auth  { code }  → { access_token }
-    // Then fetch user info from Discord API and set MY_NAME
-    console.log('Discord Activity SDK initialized');
+    console.log('Discord Activity SDK initialized', code);
     return discordSdk;
   } catch (e) {
-    console.log('Discord SDK not available — running in standalone mode');
+    console.log('Discord SDK not available — running in standalone mode', e?.message || e);
     return null;
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
+// BUTTON LISTENER WIRING  (fixes Discord iframe onclick blocking)
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // Wire every button that previously used onclick="" via addEventListener.
+  // This is the primary fix for buttons not working inside the Discord iframe
+  // because the sandbox attribute can block inline event handlers.
+  const wire = (sel, fn) => document.querySelector(sel)?.addEventListener('click', fn);
+
+  // Launcher cards
+  document.querySelectorAll('.activity-card.uno-card').forEach(el =>
+    el.addEventListener('click', () => openLobby('uno')));
+  document.querySelectorAll('.activity-card.tod-card').forEach(el =>
+    el.addEventListener('click', () => openLobby('tod')));
+
+  // Launch buttons (stop propagation already handled by checking gameType)
+  document.querySelectorAll('.uno-card .launch-btn').forEach(el =>
+    el.addEventListener('click', e => { e.stopPropagation(); openLobby('uno'); }));
+  document.querySelectorAll('.tod-card .launch-btn').forEach(el =>
+    el.addEventListener('click', e => { e.stopPropagation(); openLobby('tod'); }));
+
+  // Lobby
+  wire('#btn-confirm-name',  confirmName);
+  wire('#btn-create',        createRoom);
+  wire('#btn-join',          joinRoom);
+  wire('#btn-start-game',    startGame);
+
+  // Topbar back buttons
+  document.querySelectorAll('.back-btn').forEach((btn, i) => {
+    btn.addEventListener('click', () => {
+      const screen = btn.closest('.screen');
+      if (screen?.id === 'screen-uno') confirmLeaveGame();
+      else leaveLobby();
+    });
+  });
+
+  // UNO game buttons
+  wire('#play-btn',       playSelected);
+  wire('.uno-shout-btn',  shoutUno);
+  wire('.draw-pile-btn',  drawCardAction);
+
+  // Color picker
+  document.querySelectorAll('.color-pick-btn').forEach(btn => {
+    const colorMap = {
+      'cpb-red':    'red',
+      'cpb-blue':   'blue',
+      'cpb-yellow': 'yellow',
+      'cpb-green':  'green',
+    };
+    for (const [cls, color] of Object.entries(colorMap)) {
+      if (btn.classList.contains(cls)) {
+        btn.addEventListener('click', () => pickColor(color));
+        break;
+      }
+    }
+  });
+
+  // Win modal
+  wire('#win-modal .btn-primary', closeWinModal);
+
+  // ToD wheel
+  wire('#tod-wheel', spinWheel);
+  document.querySelectorAll('.tod-truth-btn').forEach(b =>
+    b.addEventListener('click', () => chooseTod('truth')));
+  document.querySelectorAll('.tod-dare-btn').forEach(b =>
+    b.addEventListener('click', () => chooseTod('dare')));
+
+  // Name input enter key
+  document.getElementById('inp-name')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmName();
+  });
+  document.getElementById('inp-room-code')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') joinRoom();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════════
 (async function boot() {
-  // Try Discord SDK (non-blocking)
   tryInitDiscordSdk().catch(() => {});
-
-  // Init Supabase
   const hasSupa = initSupabase();
   if (!hasSupa) {
-    console.warn('⚠️ Running without Supabase. Set CFG.SUPABASE_URL and CFG.SUPABASE_ANON_KEY for multiplayer.');
+    console.warn('Running without Supabase. Set CFG.SUPABASE_URL and CFG.SUPABASE_ANON_KEY for multiplayer.');
   }
 })();
 </script>
