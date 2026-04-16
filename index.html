@@ -759,6 +759,9 @@ body::before{
   background:linear-gradient(135deg,#e8302c,#f9c023,#2db552,#1a73e8);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
 }
+.effect-overlay-command{background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(147,51,234,.4) 0%,transparent 70%);}
+.effect-overlay-command .effect-text{color:#c084fc;}
+}
 
 /* ═══════════════════════════════
    ANIMATIONS
@@ -970,6 +973,18 @@ body::before{
         </div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-danger" id="browser-create-btn" style="flex:1;"><i class="fas fa-dice"></i> Create Multiplayer Lobby</button>
+        </div>
+        <!-- Join by code -->
+        <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.22);border-radius:14px;padding:14px 16px;">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--accent2);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+            <i class="fas fa-key"></i> Join by Code
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="browser-join-code-inp" class="inp code-inp" type="text" maxlength="6" placeholder="A B C 1 2 3" style="flex:1;font-size:18px;letter-spacing:.3em;text-align:center;text-transform:uppercase;">
+            <button class="btn btn-primary" id="browser-join-code-btn" style="flex-shrink:0;padding:11px 16px;" disabled>
+              <i class="fas fa-sign-in-alt"></i> Join
+            </button>
+          </div>
         </div>
         <div class="section-title"><i class="fas fa-door-open"></i> Active Lobbies</div>
         <div id="lobby-cards-grid" class="lobby-cards-grid">
@@ -1197,6 +1212,22 @@ body::before{
   </div>
 </div>
 
+<!-- Command Card Modal -->
+<div class="modal-overlay" id="command-modal">
+  <div class="modal-box" style="max-width:380px;">
+    <div style="font-size:36px;margin-bottom:8px;">🃏</div>
+    <h3 style="color:#c084fc;">Command Card!</h3>
+    <p style="color:var(--muted);font-size:12px;font-weight:700;margin-bottom:14px;">You may command anything in the game. All players must obey!</p>
+    <textarea id="command-card-inp" placeholder="e.g. Everyone draw 2 cards, Skip the next 2 players, Swap hands with the player to your left…" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(192,132,252,.3);border-radius:10px;padding:11px 14px;color:#fff;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;outline:none;resize:vertical;min-height:80px;box-sizing:border-box;"></textarea>
+    <div style="margin-top:14px;display:flex;gap:8px;">
+      <button class="btn btn-secondary" id="command-card-cancel" style="flex:1;">Cancel</button>
+      <button class="btn" id="command-card-confirm" style="flex:2;background:linear-gradient(135deg,#9333ea,#7c3aed);color:#fff;box-shadow:0 4px 14px rgba(147,51,234,.4);">
+        <i class="fas fa-bolt"></i> Issue Command!
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Win Modal -->
 <div class="modal-overlay" id="win-modal">
   <div class="modal-box win-modal-content">
@@ -1233,7 +1264,7 @@ const CFG = {
 // ═══════════════════════════════════════════════════════════════
 // GLOBALS
 // ═══════════════════════════════════════════════════════════════
-let SB = null, CH = null, discordSdk = null;
+let SB = null, CH = null, META_CH = null, discordSdk = null;
 let MY_ID = 'player_' + Math.random().toString(36).slice(2,9);
 let MY_NAME = '';
 let roomCode = '';
@@ -1259,7 +1290,7 @@ const AI_COLORS = ['#818cf8','#f43f5e','#22c55e','#f59e0b','#06b6d4','#8b5cf6'];
 const CARD_COLORS = ['red','blue','green','yellow'];
 const COLOR_DOT = { red:'#e8302c', blue:'#1a73e8', green:'#2db552', yellow:'#f9c023', black:'#555' };
 const VALUE_LABEL = {
-  skip:'Skip', reverse:'Reverse', draw2:'+2', wild:'Wild', wild4:'+4',
+  skip:'Skip', reverse:'Reverse', draw2:'+2', wild:'Wild', wild4:'+4', command:'CMD',
   '0':'0','1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9'
 };
 
@@ -1372,6 +1403,7 @@ function playSound(type) {
 // CARD HELPERS
 // ═══════════════════════════════════════════════════════════════
 function cardFilename(card) {
+  if (card.value === 'command') return 'CC.png';
   const colorMap = { red:'R', blue:'B', green:'G', yellow:'Y', black:'W' };
   const valMap = { skip:'S', reverse:'R', draw2:'A2', wild:'C', wild4:'4' };
   const c = colorMap[card.color] || 'W';
@@ -1402,6 +1434,7 @@ function currentTurnName() {
 }
 function isPlayable(card) {
   if (!G) return false;
+  if (card.value === 'command') return true; // Command card is always playable
   if (G.drawStack > 0) {
     if (houseRules.stack2 && card.value === 'draw2') return true;
     if (card.value === 'wild4') return true;
@@ -1411,6 +1444,7 @@ function isPlayable(card) {
   return card.color === G.topColor || card.value === G.topCard.value;
 }
 function isAiPlayable(card, topCard, topColor, drawStack) {
+  if (card.value === 'command') return true;
   if (drawStack > 0) {
     if (houseRules.stack2 && card.value === 'draw2') return true;
     if (card.value === 'wild4') return true;
@@ -1441,6 +1475,10 @@ function buildDeck() {
   for (let i = 0; i < 4; i++) {
     deck.push({ color:'black', value:'wild' });
     deck.push({ color:'black', value:'wild4' });
+  }
+  // 3 Command Cards — always playable, player commands anything
+  for (let i = 0; i < 3; i++) {
+    deck.push({ color:'black', value:'command' });
   }
   return deck;
 }
@@ -1538,6 +1576,11 @@ async function setupChannel(code) {
   CH.on('broadcast', { event: 'game_action' }, ({ payload }) => { if(!isHost) return; processAction(payload); });
   CH.on('broadcast', { event: 'tod_action' }, ({ payload }) => { applyTodAction(payload); });
   CH.on('broadcast', { event: 'chat_msg' }, ({ payload }) => { receiveChatMessage(payload); });
+  CH.on('broadcast', { event: 'command_announce' }, ({ payload }) => {
+    showToast(`🃏 ${payload.playerName} commanded: ${payload.commandText}`, 'fa-bolt', 6000);
+    showCardEffect('command', 'COMMAND!');
+    addChatMessage(null, `🃏 Command: ${payload.commandText}`, true);
+  });
   CH.on('broadcast', { event: 'house_rules' }, ({ payload }) => {
     if (!isHost) { houseRules = payload; syncHouseRulesUI(); }
   });
@@ -1588,35 +1631,51 @@ async function refreshLobbyBrowser() {
   const grid = document.getElementById('lobby-cards-grid');
   grid.innerHTML = '<div class="no-lobbies"><i class="fas fa-satellite-dish"></i>Searching for lobbies…</div>';
 
-  // We scan Supabase presence channels we know about (simplified: show known rooms)
   if (!SB) {
     grid.innerHTML = '<div class="no-lobbies"><i class="fas fa-plug"></i>No connection — create a lobby below</div>';
     return;
   }
 
-  // Subscribe to a meta-lobby channel to discover rooms
-  const metaCh = SB.channel('meta-lobby-discovery');
-  let rooms = {};
-  metaCh.on('presence', { event: 'sync' }, () => {
-    rooms = metaCh.presenceState();
-    renderLobbyBrowserRooms(rooms);
-  });
-  await metaCh.subscribe(async (status) => {
-    if (status === 'SUBSCRIBED') {
-      await metaCh.track({ code: 'browser', type: 'browser' });
-      setTimeout(() => { SB.removeChannel(metaCh); renderLobbyBrowserRooms(rooms); }, 3000);
-    }
+  // Remove old meta channel if any
+  if (META_CH) { try { await SB.removeChannel(META_CH); } catch(e){} META_CH = null; }
+
+  const discovered = {};
+  META_CH = SB.channel('meta-lobby-v2', {
+    config: { presence: { key: MY_ID } }
   });
 
-  // Also pull from our known broadcasts
-  setTimeout(() => {
-    if (Object.keys(_lobbyBrowserData).length === 0) {
-      grid.innerHTML = '<div class="no-lobbies"><i class="fas fa-search"></i>No active lobbies found<br><span style="font-size:11px;margin-top:6px;display:block;">Create one below!</span></div>';
+  META_CH.on('presence', { event: 'sync' }, () => {
+    const state = META_CH.presenceState();
+    for (const uid in state) {
+      const p = state[uid][0];
+      if (p && p.code && p.hostName) {
+        discovered[p.code] = {
+          hostName: p.hostName,
+          playerCount: p.playerCount || 1,
+          started: !!p.started,
+          gameType: p.gameType || 'uno',
+        };
+      }
     }
-  }, 3500);
+    _lobbyBrowserData = { ...discovered };
+    renderLobbyBrowserRooms();
+  });
+
+  await META_CH.subscribe(async (status) => {
+    if (status === 'SUBSCRIBED') {
+      // Track as a browser (no code = just browsing)
+      await META_CH.track({ browsing: true, name: MY_NAME });
+      // Show "no lobbies" after timeout if none found
+      setTimeout(() => {
+        if (Object.keys(discovered).length === 0) {
+          grid.innerHTML = '<div class="no-lobbies"><i class="fas fa-search"></i>No active lobbies found<br><span style="font-size:11px;margin-top:6px;display:block;">Create one below!</span></div>';
+        }
+      }, 3500);
+    }
+  });
 }
 
-function renderLobbyBrowserRooms(rooms) {
+function renderLobbyBrowserRooms() {
   const grid = document.getElementById('lobby-cards-grid');
   const entries = Object.entries(_lobbyBrowserData);
   if (entries.length === 0) {
@@ -1629,7 +1688,6 @@ function renderLobbyBrowserRooms(rooms) {
     const count = info.playerCount || 0;
     const el = document.createElement('div');
     el.className = 'lobby-card-item' + (started ? ' in-progress' : '');
-    const statusText = started ? 'In Progress' : 'Waiting';
     const statusClass = started ? 'playing' : 'waiting';
     const actionText = started ? 'SPECTATE' : 'JOIN';
     el.innerHTML = `
@@ -1665,19 +1723,33 @@ function joinLobbyFromBrowser(code, started) {
 }
 
 function announceLobby() {
-  if (!CH || !isHost) return;
-  broadcast('lobby_info', {
+  if (!isHost || !roomCode) return;
+  const info = {
     code: roomCode,
     hostName: MY_NAME,
     playerCount: Object.keys(lobbyPlayers).length,
     started: !!(G && G.started),
     gameType,
-  });
+  };
+  // Update local cache
   _lobbyBrowserData[roomCode] = {
     hostName: MY_NAME,
     playerCount: Object.keys(lobbyPlayers).length,
     started: !!(G && G.started),
   };
+  // Track on shared discovery channel so all browsers see it in real-time
+  if (SB) {
+    if (!META_CH || META_CH.state === 'closed') {
+      META_CH = SB.channel('meta-lobby-v2', {
+        config: { presence: { key: MY_ID } }
+      });
+      META_CH.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') await META_CH.track(info);
+      });
+    } else {
+      META_CH.track(info).catch(()=>{});
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1879,6 +1951,7 @@ function leaveLobby() {
   stopTurnTimer();
   clearTimeout(_aiThinkTimeout);
   if (CH) { SB?.removeChannel(CH); CH = null; }
+  if (META_CH) { try { META_CH.untrack(); SB?.removeChannel(META_CH); } catch(e){} META_CH = null; }
   roomCode = '';
   isHost = false;
   isAiMode = false;
@@ -1989,6 +2062,19 @@ function processAction({ type, playerId, cards, card, chosenColor, swapTargetId 
   } else if (type === 'uno_shout') {
     addLog(`${G.players[playerId]?.name} shouted UNO!`, 'log-warn');
 
+  } else if (type === 'command_card') {
+    // Remove the command card from hand
+    if (G.hands[playerId]) {
+      const idx = G.hands[playerId].findIndex(h => h.value === 'command');
+      if (idx !== -1) G.hands[playerId].splice(idx, 1);
+    }
+    G.players[playerId].cardCount = G.hands[playerId]?.length ?? 0;
+    const pName = G.players[playerId]?.name || 'Player';
+    addLog(`🃏 ${pName} commanded: "${card.commandText}"`, 'log-special');
+    if (checkWin(playerId)) { broadcastFullState(); return; }
+    broadcast('command_announce', { playerName: pName, commandText: card.commandText });
+    advanceTurn(1);
+
   } else if (type === 'timer_draw') {
     if (!G.deck.length) reshuffleDeck();
     const drawn = G.deck.splice(0,1);
@@ -2097,10 +2183,15 @@ function applyCardEffect(card, playerId, chosenColor, swapTargetId, allCards) {
     showCardEffect('reverse', 'ROTATE!');
     advanceTurn(1);
 
+  } else if (card.value === 'command') {
+    // Command handled separately — just advance turn
+    addLog(`${G.players[playerId]?.name} issued a Command!`, 'log-special');
+    showCardEffect('command', 'COMMAND!');
+    advanceTurn(1);
+
   } else {
     advanceTurn(1);
   }
-}
 
 function checkWin(playerId) {
   if (!G.hands[playerId] || G.hands[playerId].length > 0) return false;
@@ -2282,8 +2373,15 @@ function playSelected() {
     return;
   }
 
-  if (cards.length === 1 && firstCard.color === 'black') {
+  if (cards.length === 1 && firstCard.color === 'black' && firstCard.value !== 'command') {
     document.getElementById('color-modal').classList.add('show');
+    return;
+  }
+
+  // Command card
+  if (cards.length === 1 && firstCard.value === 'command') {
+    document.getElementById('command-card-inp').value = '';
+    document.getElementById('command-modal').classList.add('show');
     return;
   }
 
@@ -2296,7 +2394,7 @@ function playSelected() {
   executePlay(cards, null);
 }
 
-function executePlay(cards, chosenColor, swapTargetId=null) {
+function executePlay(cards, chosenColor, swapTargetId=null, commandText=null) {
   clearTimeout(_aiThinkTimeout);
   stopTurnTimer();
   const indices = [...selectedIndices].sort((a,b)=>b-a);
@@ -2306,10 +2404,18 @@ function executePlay(cards, chosenColor, swapTargetId=null) {
   document.getElementById('stack-mode-indicator').style.display = 'none';
   playSound('play');
   if (G.myHand.length === 1) setTimeout(()=>showToast('1 card left — shout UNO!','fa-exclamation'),200);
+
+  // If this is a command card, show the command text toast immediately to local player
+  if (commandText) {
+    showToast(`🃏 Command: ${commandText}`, 'fa-bolt', 5000);
+    showCardEffect('command', 'COMMAND!');
+  }
+
   const payload = {
-    type: cards.length > 1 ? 'play_cards' : 'play_card',
+    type: commandText ? 'command_card' : (cards.length > 1 ? 'play_cards' : 'play_card'),
     playerId: MY_ID,
-    cards, card: cards[0], chosenColor, swapTargetId
+    cards, card: { ...cards[0], commandText },
+    chosenColor, swapTargetId,
   };
   if (isHost) processAction(payload);
   else { broadcast('game_action', payload); renderGame(); _afterTurnSetup(); }
@@ -2919,6 +3025,19 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('browser-inp-name')?.addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('browser-confirm-name').click(); });
 
+  // Join by code (lobby browser)
+  document.getElementById('browser-join-code-inp')?.addEventListener('input', () => {
+    const el = document.getElementById('browser-join-code-inp');
+    el.value = el.value.toUpperCase();
+    document.getElementById('browser-join-code-btn').disabled = el.value.trim().length < 3;
+  });
+  document.getElementById('browser-join-code-inp')?.addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('browser-join-code-btn').click(); });
+  wire('#browser-join-code-btn', () => {
+    const code = document.getElementById('browser-join-code-inp').value.trim().toUpperCase();
+    if (code.length < 3) { showToast('Enter a room code first','fa-exclamation-triangle'); return; }
+    joinLobbyFromBrowser(code, false);
+  });
+
   // Lobby waiting room
   wire('#lobby-back-btn', leaveLobby);
   wire('#btn-start-game', startGame);
@@ -2959,6 +3078,23 @@ document.addEventListener('DOMContentLoaded', () => {
       if(btn.classList.contains(cls)){ btn.addEventListener('click',()=>pickColor(color)); break; }
     }
   });
+
+  // Command card modal
+  wire('#command-card-cancel', () => {
+    document.getElementById('command-modal').classList.remove('show');
+    selectedIndices = [];
+    renderHand();
+    document.getElementById('play-btn').disabled = true;
+  });
+  wire('#command-card-confirm', () => {
+    const text = document.getElementById('command-card-inp').value.trim();
+    if (!text) { showToast('Enter a command first!','fa-exclamation-triangle'); return; }
+    document.getElementById('command-modal').classList.remove('show');
+    if (selectedIndices.length === 0) return;
+    const cards = selectedIndices.map(i=>G.myHand[i]);
+    executePlay(cards, null, null, text);
+  });
+  document.getElementById('command-card-inp')?.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey) document.getElementById('command-card-confirm').click(); });
 
   // Win modal
   wire('#win-modal-btn', closeWinModal);
