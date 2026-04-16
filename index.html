@@ -6,22 +6,8 @@
 <title>Game Hub · Discord Activity</title>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<!-- Supabase for real-time multiplayer -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-
-<!-- ══════════════════════════════════════════════════
-     DISCORD ACTIVITY SDK  — loaded synchronously so
-     it is ready before any inline JS runs.
-     The embedded-app-sdk REQUIRES the page to be
-     served inside an <iframe> proxied by Discord's
-     tunnel (/.proxy/…).  When it isn't (plain web),
-     the SDK's postMessage handshake simply times out
-     and we fall through to standalone mode gracefully.
-══════════════════════════════════════════════════ -->
 <script>
-/* Minimal polyfill: give the SDK a real MessageChannel
-   even if the page is in a sandboxed iframe where some
-   browsers restrict it. */
 if (typeof MessageChannel === 'undefined') {
   window.MessageChannel = class {
     constructor() {
@@ -31,7 +17,6 @@ if (typeof MessageChannel === 'undefined') {
   };
 }
 </script>
-
 <style>
 /* ═══════════════════════════════
    VARIABLES & RESET
@@ -51,6 +36,9 @@ if (typeof MessageChannel === 'undefined') {
   --tod-pink:   #ec4899;
   --text:       #e2e4f0;
   --muted:      #6b7280;
+  --timer-warn: #f59e0b;
+  --timer-crit: #ef4444;
+  --ai-color:   #818cf8;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{
@@ -61,15 +49,7 @@ body{
   display:flex;flex-direction:column;align-items:center;
   overflow-x:hidden;
 }
-
-/* ═══════════════════════════════
-   ANIMATED BACKGROUND CANVAS
-═══════════════════════════════ */
-#bg-canvas{
-  position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.7;
-}
-
-/* Static gradient layer on top of canvas */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.7;}
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
   background:
@@ -77,12 +57,7 @@ body::before{
     radial-gradient(circle at 15% 85%,rgba(124,58,237,.07) 0%,transparent 40%),
     radial-gradient(circle at 85% 15%,rgba(236,72,153,.05) 0%,transparent 40%);
 }
-
-/* All main content sits above canvas */
-.screen, .toast, .modal-overlay {
-  position: relative;
-  z-index: 2;
-}
+.screen,.toast,.modal-overlay{position:relative;z-index:2;}
 
 /* ═══════════════════════════════
    SCREEN MANAGER
@@ -134,13 +109,9 @@ body::before{
 }
 .uno-card .card-glow{background:var(--uno-red);}
 .tod-card .card-glow{background:var(--tod-purple);}
-.card-icon{
-  font-size:50px;margin-bottom:12px;display:block;
-  filter:drop-shadow(0 4px 12px rgba(0,0,0,.5));
-  /* For img icons (uno.png) */
-}
+.card-icon{font-size:50px;margin-bottom:12px;display:block;filter:drop-shadow(0 4px 12px rgba(0,0,0,.5));}
 .card-icon img{width:54px;height:54px;object-fit:contain;display:block;}
-.card-icon .fa-icon-large { font-size:48px; display:block; }
+.card-icon .fa-icon-large{font-size:48px;display:block;}
 .card-label{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px;}
 .uno-card .card-label{color:var(--uno-red);}
 .tod-card .card-label{color:#a78bfa;}
@@ -164,7 +135,7 @@ body::before{
 .tod-card .launch-btn:hover{box-shadow:0 6px 24px rgba(124,58,237,.6);transform:scale(1.02);}
 
 /* ═══════════════════════════════
-   LOBBY SCREEN
+   LOBBY
 ═══════════════════════════════ */
 #screen-lobby{justify-content:center;padding:32px 20px;gap:20px;background:transparent;}
 .lobby-header{text-align:center;animation:fadeDown .5s ease both;}
@@ -185,10 +156,7 @@ body::before{
 }
 .inp:focus{border-color:var(--accent);}
 .inp::placeholder{color:rgba(255,255,255,.25);}
-.inp.code-inp{
-  letter-spacing:.4em;font-size:22px;text-align:center;
-  font-family:'Fredoka One',cursive;text-transform:uppercase;
-}
+.inp.code-inp{letter-spacing:.4em;font-size:22px;text-align:center;font-family:'Fredoka One',cursive;text-transform:uppercase;}
 .btn-row{display:flex;gap:10px;margin-top:6px;}
 .btn{
   flex:1;padding:11px 16px;border-radius:10px;border:none;
@@ -205,6 +173,8 @@ body::before{
 .btn-success{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 4px 14px rgba(34,197,94,.4);}
 .btn-success:hover{box-shadow:0 6px 20px rgba(34,197,94,.5);transform:scale(1.02);}
 .btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important;}
+.btn-ai{background:linear-gradient(135deg,#818cf8,#6366f1);color:#fff;box-shadow:0 4px 14px rgba(129,140,248,.4);}
+.btn-ai:hover{box-shadow:0 6px 20px rgba(129,140,248,.6);transform:scale(1.02);}
 .room-code-display{
   background:rgba(88,101,242,.12);border:2px solid rgba(88,101,242,.3);
   border-radius:14px;padding:16px;margin:12px 0;text-align:center;
@@ -226,22 +196,39 @@ body::before{
   font-size:14px;font-weight:900;color:#fff;flex-shrink:0;
 }
 .lp-name{font-size:13px;font-weight:800;flex:1;}
-.lp-badge{
-  font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
-  padding:2px 8px;border-radius:8px;
-}
+.lp-badge{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:8px;}
 .lp-badge.host{background:rgba(249,192,35,.2);color:var(--uno-yellow);}
 .lp-badge.you{background:rgba(88,101,242,.2);color:var(--accent2);}
+.lp-badge.ai-badge{background:rgba(129,140,248,.2);color:var(--ai-color);}
 .lobby-divider{
   display:flex;align-items:center;gap:10px;color:var(--muted);
   font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin:6px 0;
 }
-.lobby-divider::before,.lobby-divider::after{
-  content:'';flex:1;height:1px;background:var(--border);
+.lobby-divider::before,.lobby-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* AI Mode toggle row in lobby */
+.ai-mode-row{
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(129,140,248,.07);border:1px solid rgba(129,140,248,.2);
+  border-radius:12px;padding:12px 14px;margin-top:4px;
 }
+.ai-mode-label{font-size:13px;font-weight:800;color:#a5b4fc;display:flex;align-items:center;gap:7px;}
+.ai-mode-label small{font-size:10px;color:var(--muted);font-weight:700;display:block;margin-top:1px;}
+.toggle-switch{position:relative;width:42px;height:24px;flex-shrink:0;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.toggle-slider{
+  position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:24px;
+  cursor:pointer;transition:background .3s;border:1px solid rgba(255,255,255,.1);
+}
+.toggle-slider::before{
+  content:'';position:absolute;width:18px;height:18px;border-radius:50%;
+  background:#fff;top:2px;left:2px;transition:transform .3s;box-shadow:0 2px 4px rgba(0,0,0,.3);
+}
+.toggle-switch input:checked + .toggle-slider{background:var(--ai-color);border-color:rgba(129,140,248,.4);}
+.toggle-switch input:checked + .toggle-slider::before{transform:translateX(18px);}
 
 /* ═══════════════════════════════
-   GAME TOP BAR (shared)
+   GAME TOP BAR
 ═══════════════════════════════ */
 .game-topbar{
   width:100%;background:rgba(0,0,0,.45);backdrop-filter:blur(20px);
@@ -257,7 +244,39 @@ body::before{
 }
 .back-btn:hover{background:rgba(255,255,255,.15);}
 .topbar-title{font-family:'Fredoka One',cursive;font-size:19px;color:#fff;display:flex;align-items:center;gap:7px;}
-.topbar-meta{font-size:11px;color:var(--muted);font-weight:700;}
+.topbar-meta{font-size:11px;color:var(--muted);font-weight:700;display:flex;align-items:center;gap:8px;}
+
+/* ═══════════════════════════════
+   TURN TIMER
+═══════════════════════════════ */
+.turn-timer-wrap{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(255,255,255,.06);border:1px solid var(--border);
+  border-radius:10px;padding:5px 10px;transition:all .4s;
+}
+.turn-timer-wrap.warn{
+  background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.35);
+}
+.turn-timer-wrap.crit{
+  background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.45);
+  animation:timerPulse .5s ease infinite;
+}
+.turn-timer-num{
+  font-family:'Fredoka One',cursive;font-size:16px;color:#fff;
+  min-width:22px;text-align:center;line-height:1;
+}
+.turn-timer-wrap.warn .turn-timer-num{color:var(--timer-warn);}
+.turn-timer-wrap.crit .turn-timer-num{color:var(--timer-crit);}
+.turn-timer-ring{width:20px;height:20px;flex-shrink:0;}
+.turn-timer-ring circle{
+  fill:none;stroke-width:3;stroke-linecap:round;
+  transform-origin:50% 50%;transform:rotate(-90deg);
+  transition:stroke-dashoffset .9s linear,stroke .4s;
+}
+.ring-bg{stroke:rgba(255,255,255,.1);}
+.ring-fg{stroke:var(--accent2);stroke-dasharray:50.26;stroke-dashoffset:0;}
+.turn-timer-wrap.warn .ring-fg{stroke:var(--timer-warn);}
+.turn-timer-wrap.crit .ring-fg{stroke:var(--timer-crit);}
 
 /* ═══════════════════════════════
    UNO GAME SCREEN
@@ -267,13 +286,11 @@ body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
   background:radial-gradient(ellipse 60% 40% at 50% 50%,rgba(232,48,44,.07) 0%,transparent 70%);
 }
-#screen-uno > * { position:relative; z-index:2; }
+#screen-uno > * {position:relative;z-index:2;}
 .uno-table{
   width:100%;max-width:900px;margin:0 auto;
-  padding:18px 16px 130px;display:flex;flex-direction:column;align-items:center;gap:18px;
+  padding:18px 16px 140px;display:flex;flex-direction:column;align-items:center;gap:18px;
 }
-
-/* ── Players row ── */
 .players-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%;animation:fadeDown .4s ease both;}
 .player-chip{
   display:flex;flex-direction:column;align-items:center;gap:5px;
@@ -298,6 +315,14 @@ body::before{
   background:rgba(255,255,255,.8);color:#111;font-size:7px;font-weight:900;
   letter-spacing:.1em;padding:2px 7px;border-radius:8px;
 }
+.player-chip.ai-chip{border-color:rgba(129,140,248,.4);}
+.player-chip.ai-chip.other-active-player{
+  border-color:var(--ai-color);background:rgba(129,140,248,.1);
+  box-shadow:0 0 18px rgba(129,140,248,.2);
+}
+.player-chip.ai-chip.other-active-player::before{
+  content:'AI TURN';background:var(--ai-color);
+}
 .player-avatar{
   width:38px;height:38px;border-radius:50%;display:flex;
   align-items:center;justify-content:center;font-size:17px;font-weight:900;
@@ -311,6 +336,20 @@ body::before{
 }
 .player-name{font-size:11px;font-weight:800;color:#d1d5db;text-align:center;}
 .player-score{font-size:10px;color:var(--muted);font-weight:700;}
+
+/* AI thinking chip indicator */
+.ai-thinking-chip{
+  display:flex;align-items:center;gap:4px;
+  background:rgba(129,140,248,.15);border:1px solid rgba(129,140,248,.3);
+  border-radius:8px;padding:3px 7px;margin-top:3px;
+}
+.ai-thinking-chip span{font-size:8px;font-weight:800;color:var(--ai-color);letter-spacing:.06em;text-transform:uppercase;}
+.ai-dots span{
+  display:inline-block;width:3px;height:3px;border-radius:50%;
+  background:var(--ai-color);animation:dotPulse .9s ease infinite;margin:0 1px;
+}
+.ai-dots span:nth-child(2){animation-delay:.15s;}
+.ai-dots span:nth-child(3){animation-delay:.3s;}
 
 /* ── Game arena ── */
 .game-arena{
@@ -330,7 +369,7 @@ body::before{
 .draw-pile-inner{text-align:center;}
 .draw-pile-label{font-size:10px;color:var(--muted);font-weight:800;margin-top:4px;letter-spacing:.05em;}
 
-/* ── Card image styles ── */
+/* ── Card styles ── */
 .card-img-wrap{
   position:relative;flex-shrink:0;
   transition:transform .15s ease,filter .15s ease;
@@ -371,14 +410,13 @@ body::before{
   transform:rotate(-15deg);letter-spacing:.02em;
 }
 
-/* ── Your hand (fixed bottom) ── */
+/* ── Your hand ── */
 .your-hand{
   position:fixed;bottom:0;left:0;right:0;
   padding:14px 14px 18px;
   background:linear-gradient(to top,rgba(13,15,26,1) 65%,transparent);
   display:flex;flex-direction:column;align-items:center;gap:10px;z-index:50;
 }
-.hand-label{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.2);}
 .hand-cards{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;max-height:120px;overflow:visible;}
 .action-bar{display:flex;gap:8px;align-items:center;}
 .play-btn{
@@ -404,6 +442,21 @@ body::before{
 }
 .turn-indicator.is-your-turn{color:var(--uno-yellow);}
 
+/* ── Timer bar in hand area ── */
+.hand-timer-bar{
+  width:100%;max-width:340px;height:4px;
+  background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;
+  display:none;
+}
+.hand-timer-bar.visible{display:block;}
+.hand-timer-fill{
+  height:100%;border-radius:4px;
+  background:var(--accent2);
+  transition:width .9s linear,background .4s;
+}
+.hand-timer-fill.warn{background:var(--timer-warn);}
+.hand-timer-fill.crit{background:var(--timer-crit);}
+
 /* ── Game log ── */
 .game-log{
   width:100%;max-width:420px;background:rgba(0,0,0,.25);
@@ -415,6 +468,8 @@ body::before{
 .log-you{color:#60a5fa;}
 .log-warn{color:var(--uno-yellow);}
 .log-system{color:#a78bfa;}
+.log-ai{color:var(--ai-color);}
+.log-timer{color:var(--timer-warn);}
 
 .active-color-dot{
   width:14px;height:14px;border-radius:50%;display:inline-block;
@@ -423,7 +478,7 @@ body::before{
 }
 
 /* ═══════════════════════════════
-   TRUTH OR DARE SCREEN
+   TRUTH OR DARE
 ═══════════════════════════════ */
 #screen-tod{padding:0;background:transparent;position:relative;overflow:hidden;}
 #screen-tod::before{
@@ -432,7 +487,7 @@ body::before{
     radial-gradient(ellipse 70% 50% at 30% 40%,rgba(124,58,237,.11) 0%,transparent 60%),
     radial-gradient(ellipse 60% 40% at 70% 60%,rgba(236,72,153,.07) 0%,transparent 50%);
 }
-#screen-tod > * { position:relative; z-index:2; }
+#screen-tod > *{position:relative;z-index:2;}
 .tod-arena{width:100%;max-width:680px;margin:0 auto;padding:18px 16px 40px;display:flex;flex-direction:column;align-items:center;gap:22px;}
 .tod-players{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%;animation:fadeDown .4s ease both;}
 .tod-player-chip{
@@ -443,10 +498,6 @@ body::before{
 .tod-player-chip.spotlight{
   border-color:var(--tod-pink);background:rgba(236,72,153,.1);
   box-shadow:0 0 24px rgba(236,72,153,.3);transform:scale(1.05);
-}
-.tod-player-chip.spotlight::before{
-  content:'';position:absolute;top:-13px;font-size:15px;animation:bounce 1s ease infinite;
-  /* replaced emoji with FA icon via JS */
 }
 .tod-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#fff;}
 .tod-pname{font-size:11px;font-weight:800;color:#d1d5db;text-align:center;}
@@ -515,7 +566,6 @@ body::before{
 .cpb-blue{background:var(--uno-blue);}
 .cpb-yellow{background:var(--uno-yellow);}
 .cpb-green{background:var(--uno-green);}
-
 .win-modal-content{animation:cardReveal .5s cubic-bezier(.34,1.56,.64,1) both;}
 .win-icon{font-size:64px;margin-bottom:12px;display:block;color:var(--uno-yellow);}
 .win-subtitle{font-size:13px;color:var(--muted);font-weight:700;margin-bottom:20px;}
@@ -546,12 +596,8 @@ body::before{
 @keyframes wheelSpin{0%{transform:rotate(0deg) scale(1.04)}50%{transform:rotate(180deg) scale(1.08)}100%{transform:rotate(360deg) scale(1.04)}}
 @keyframes cardPlay{0%{transform:translateY(-50px) scale(1.15) rotate(-8deg);opacity:0}100%{transform:translateY(0) scale(1) rotate(0);opacity:1}}
 @keyframes cardSlide{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
-@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
-/* Background orb float animations */
-@keyframes floatOrb1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,-40px) scale(1.1)}66%{transform:translate(-30px,50px) scale(.95)}}
-@keyframes floatOrb2{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(-80px,30px) scale(1.08)}80%{transform:translate(50px,-60px) scale(.92)}}
-@keyframes floatOrb3{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(40px,70px) scale(1.12)}75%{transform:translate(-60px,-20px) scale(.9)}}
-@keyframes particleDrift{0%{transform:translateY(0) translateX(0);opacity:0}10%{opacity:1}90%{opacity:.3}100%{transform:translateY(-100vh) translateX(var(--drift));opacity:0}}
+@keyframes timerPulse{0%,100%{box-shadow:0 0 0 rgba(239,68,68,0)}50%{box-shadow:0 0 12px rgba(239,68,68,.5)}}
+@keyframes aiThink{0%,100%{opacity:.5;transform:scale(.96)}50%{opacity:1;transform:scale(1.04)}}
 .card-play-anim{animation:cardPlay .4s cubic-bezier(.34,1.56,.64,1) both;}
 .card-slide-in{animation:cardSlide .3s ease both;}
 
@@ -563,12 +609,9 @@ body::before{
 </head>
 <body>
 
-<!-- Animated Background Canvas -->
 <canvas id="bg-canvas"></canvas>
 
-<!-- ══════════════════════════════
-     LAUNCHER
-══════════════════════════════ -->
+<!-- LAUNCHER -->
 <div id="screen-launcher" class="screen active">
   <div class="launcher-header">
     <div class="discord-badge">
@@ -579,23 +622,20 @@ body::before{
     <p>Play with friends right inside your voice channel</p>
   </div>
   <div class="activity-grid">
-    <div class="activity-card uno-card" onclick="openLobby('uno')">
+    <div class="activity-card uno-card">
       <div class="card-glow"></div>
-      <!-- uno.png replaces card emoji -->
       <span class="card-icon"><img src="uno.png" alt="UNO" onerror="this.parentElement.innerHTML='<i class=\'fas fa-layer-group fa-icon-large\' style=\'color:#e8302c;\'></i>'"></span>
       <div class="card-label">Card Game</div>
       <div class="card-title">UNO</div>
-      <div class="card-desc">Draw, match, and shout UNO! Real-time multiplayer with your voice channel friends.</div>
+      <div class="card-desc">Draw, match, and shout UNO! Real-time multiplayer with your voice channel friends. Solo AI mode available.</div>
       <div class="card-meta">
         <span class="meta-pill"><i class="fas fa-users"></i> 2–10 Players</span>
-        <span class="meta-pill"><i class="fas fa-circle" style="color:#e8302c;font-size:7px;"></i> Real-time</span>
+        <span class="meta-pill"><i class="fas fa-robot"></i> AI Mode</span>
         <span class="meta-pill"><i class="fas fa-gamepad"></i> Turn Based</span>
       </div>
-      <button class="launch-btn" onclick="event.stopPropagation();openLobby('uno')">
-        <i class="fas fa-rocket"></i> Launch Game
-      </button>
+      <button class="launch-btn"><i class="fas fa-rocket"></i> Launch Game</button>
     </div>
-    <div class="activity-card tod-card" onclick="openLobby('tod')">
+    <div class="activity-card tod-card">
       <div class="card-glow"></div>
       <span class="card-icon"><i class="fas fa-bullseye fa-icon-large" style="color:#ec4899;"></i></span>
       <div class="card-label">Party Game</div>
@@ -606,50 +646,62 @@ body::before{
         <span class="meta-pill"><i class="fas fa-robot"></i> AI Prompts</span>
         <span class="meta-pill"><i class="fas fa-fire"></i> Party Mode</span>
       </div>
-      <button class="launch-btn" onclick="event.stopPropagation();openLobby('tod')">
-        <i class="fas fa-rocket"></i> Launch Game
-      </button>
+      <button class="launch-btn"><i class="fas fa-rocket"></i> Launch Game</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════
-     LOBBY
-══════════════════════════════ -->
+<!-- LOBBY -->
 <div id="screen-lobby" class="screen">
   <div class="game-topbar">
-    <button class="back-btn" onclick="leaveLobby()"><i class="fas fa-arrow-left"></i> Back</button>
+    <button class="back-btn"><i class="fas fa-arrow-left"></i> Back</button>
     <div class="topbar-title" id="lobby-title"><i class="fas fa-layer-group"></i> UNO Lobby</div>
     <div class="topbar-meta" id="lobby-player-count">0 players</div>
   </div>
-
   <div style="width:100%;max-width:480px;padding:20px 16px;display:flex;flex-direction:column;gap:16px;">
-
     <div class="lobby-box" id="lobby-name-box">
       <h3>Who are you?</h3>
       <div class="field-label">Your Display Name</div>
-      <input id="inp-name" class="inp" type="text" maxlength="18" placeholder="Enter your name…" oninput="onNameInput()">
+      <input id="inp-name" class="inp" type="text" maxlength="18" placeholder="Enter your name…">
       <div class="btn-row" style="margin-top:12px;">
-        <button class="btn btn-primary" id="btn-confirm-name" onclick="confirmName()" disabled>
+        <button class="btn btn-primary" id="btn-confirm-name" disabled>
           Continue <i class="fas fa-arrow-right"></i>
         </button>
       </div>
     </div>
-
     <div class="lobby-box" id="lobby-room-box" style="display:none;">
       <div style="display:flex;gap:10px;flex-direction:column;">
-        <button class="btn btn-danger" onclick="createRoom()" id="btn-create">
-          <i class="fas fa-dice"></i> Create Room
-        </button>
+        <button class="btn btn-danger" id="btn-create"><i class="fas fa-dice"></i> Create Room</button>
+        <div class="lobby-divider">or play vs AI</div>
+        <div class="ai-mode-row">
+          <div class="ai-mode-label">
+            <i class="fas fa-robot"></i>
+            <div>
+              Solo AI Mode
+              <small>Play alone vs AI opponents</small>
+            </div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="ai-mode-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="ai-count-row" style="display:none;">
+          <div class="field-label">Number of AI Opponents</div>
+          <select id="ai-count-select" class="inp" style="cursor:pointer;">
+            <option value="1">1 AI opponent</option>
+            <option value="2" selected>2 AI opponents</option>
+            <option value="3">3 AI opponents</option>
+            <option value="4">4 AI opponents</option>
+          </select>
+        </div>
+        <button class="btn btn-ai" id="btn-play-ai" style="display:none;"><i class="fas fa-robot"></i> Play vs AI</button>
         <div class="lobby-divider">or join existing</div>
         <div class="field-label">Room Code</div>
-        <input id="inp-room-code" class="inp code-inp" type="text" maxlength="6" placeholder="A B C 1 2 3" oninput="this.value=this.value.toUpperCase()">
-        <button class="btn btn-secondary" onclick="joinRoom()" id="btn-join">
-          <i class="fas fa-sign-in-alt"></i> Join Room
-        </button>
+        <input id="inp-room-code" class="inp code-inp" type="text" maxlength="6" placeholder="A B C 1 2 3">
+        <button class="btn btn-secondary" id="btn-join"><i class="fas fa-sign-in-alt"></i> Join Room</button>
       </div>
     </div>
-
     <div class="lobby-box" id="lobby-waiting-box" style="display:none;">
       <div id="room-code-display" class="room-code-display" style="display:none;">
         <div class="code-big" id="room-code-text">——</div>
@@ -658,7 +710,7 @@ body::before{
       <h3 style="margin-top:4px;">Players in Room</h3>
       <div class="lobby-players" id="lobby-player-list"></div>
       <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
-        <button class="btn btn-success" id="btn-start-game" onclick="startGame()" disabled style="display:none;">
+        <button class="btn btn-success" id="btn-start-game" disabled style="display:none;">
           <i class="fas fa-play"></i> Start Game
         </button>
         <div id="lobby-waiting-msg" style="font-size:12px;color:var(--muted);font-weight:700;text-align:center;">
@@ -666,26 +718,31 @@ body::before{
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
-<!-- ══════════════════════════════
-     UNO GAME
-══════════════════════════════ -->
+<!-- UNO GAME -->
 <div id="screen-uno" class="screen">
   <div class="game-topbar">
-    <button class="back-btn" onclick="confirmLeaveGame()"><i class="fas fa-door-open"></i> Leave</button>
-    <div class="topbar-title"><i class="fas fa-layer-group"></i> UNO</div>
+    <button class="back-btn" id="uno-leave-btn"><i class="fas fa-door-open"></i> Leave</button>
+    <div class="topbar-title">
+      <i class="fas fa-layer-group"></i> UNO
+      <span id="ai-mode-badge" style="display:none;background:rgba(129,140,248,.2);border:1px solid rgba(129,140,248,.35);border-radius:8px;padding:2px 8px;font-size:10px;color:var(--ai-color);font-family:'Nunito',sans-serif;font-weight:800;">AI</span>
+    </div>
     <div class="topbar-meta">
       <span id="active-color-label"></span>
       Round <span id="uno-round">1</span>
+      <div class="turn-timer-wrap" id="topbar-timer" style="display:none;">
+        <svg class="turn-timer-ring" viewBox="0 0 20 20">
+          <circle class="ring-bg" cx="10" cy="10" r="8"/>
+          <circle class="ring-fg" id="timer-ring-fg" cx="10" cy="10" r="8"/>
+        </svg>
+        <span class="turn-timer-num" id="topbar-timer-num">25</span>
+      </div>
     </div>
   </div>
-
   <div class="uno-table">
     <div class="players-row" id="uno-players"></div>
-
     <div class="game-arena">
       <div class="arena-ring"></div>
       <div class="arena-ring-2"></div>
@@ -700,7 +757,7 @@ body::before{
         </svg>
       </div>
       <div class="discard-pile" id="discard-pile"></div>
-      <div class="draw-pile-btn" onclick="drawCardAction()" title="Draw a card">
+      <div class="draw-pile-btn" id="draw-pile-btn" title="Draw a card">
         <div class="draw-pile-inner">
           <div class="card-back-css" id="draw-pile-card" style="width:62px;height:93px;">
             <div class="card-back-logo">UNO</div>
@@ -709,49 +766,44 @@ body::before{
         </div>
       </div>
     </div>
-
     <div class="game-log" id="game-log"></div>
   </div>
-
   <div class="your-hand">
     <div class="turn-indicator" id="turn-indicator">
       <i class="fas fa-hourglass-half"></i> Waiting for turn…
     </div>
+    <div class="hand-timer-bar" id="hand-timer-bar">
+      <div class="hand-timer-fill" id="hand-timer-fill" style="width:100%"></div>
+    </div>
     <div class="hand-cards" id="hand-cards"></div>
     <div class="action-bar">
-      <button class="play-btn" id="play-btn" onclick="playSelected()" disabled>
+      <button class="play-btn" id="play-btn" disabled>
         <i class="fas fa-play"></i> Play Card
       </button>
-      <button class="uno-shout-btn" onclick="shoutUno()">UNO!</button>
+      <button class="uno-shout-btn" id="uno-shout-btn">UNO!</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════
-     TRUTH OR DARE
-══════════════════════════════ -->
+<!-- TRUTH OR DARE -->
 <div id="screen-tod" class="screen">
   <div class="game-topbar">
-    <button class="back-btn" onclick="leaveLobby()"><i class="fas fa-arrow-left"></i> Leave</button>
+    <button class="back-btn" id="tod-back-btn"><i class="fas fa-arrow-left"></i> Leave</button>
     <div class="topbar-title"><i class="fas fa-bullseye"></i> Truth or Dare</div>
     <div class="topbar-meta">Round <span id="tod-round">1</span></div>
   </div>
   <div class="tod-arena">
     <div class="tod-players" id="tod-players"></div>
     <div class="tod-wheel-area">
-      <div class="wheel-ring" id="tod-wheel" onclick="spinWheel()">
+      <div class="wheel-ring" id="tod-wheel">
         <div class="wheel-inner">
           <i class="fas fa-bullseye" id="wheel-icon"></i>
           <span id="wheel-label">Spin!</span>
         </div>
       </div>
       <div class="tod-choice-btns" id="tod-choice-btns" style="display:none;">
-        <button class="tod-btn tod-truth-btn" onclick="chooseTod('truth')">
-          <i class="fas fa-comment"></i> Truth
-        </button>
-        <button class="tod-btn tod-dare-btn" onclick="chooseTod('dare')">
-          <i class="fas fa-fire"></i> Dare
-        </button>
+        <button class="tod-btn tod-truth-btn"><i class="fas fa-comment"></i> Truth</button>
+        <button class="tod-btn tod-dare-btn"><i class="fas fa-fire"></i> Dare</button>
       </div>
     </div>
     <div id="tod-prompt-area"></div>
@@ -763,30 +815,22 @@ body::before{
   <div class="color-modal">
     <h3>Choose a Color</h3>
     <div class="color-picker-grid">
-      <button class="color-pick-btn cpb-red"    onclick="pickColor('red')">
-        <i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i>
-      </button>
-      <button class="color-pick-btn cpb-blue"   onclick="pickColor('blue')">
-        <i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i>
-      </button>
-      <button class="color-pick-btn cpb-yellow" onclick="pickColor('yellow')">
-        <i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i>
-      </button>
-      <button class="color-pick-btn cpb-green"  onclick="pickColor('green')">
-        <i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i>
-      </button>
+      <button class="color-pick-btn cpb-red"><i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i></button>
+      <button class="color-pick-btn cpb-blue"><i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i></button>
+      <button class="color-pick-btn cpb-yellow"><i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i></button>
+      <button class="color-pick-btn cpb-green"><i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i></button>
     </div>
   </div>
 </div>
 
-<!-- Win / Game Over Modal -->
+<!-- Win Modal -->
 <div class="modal-overlay" id="win-modal">
   <div class="modal-box win-modal-content">
     <i class="fas fa-trophy win-icon" id="win-icon"></i>
     <h3 id="win-title">You Win!</h3>
     <p class="win-subtitle" id="win-subtitle">Great game!</p>
     <div class="btn-row" style="margin-top:16px;">
-      <button class="btn btn-primary" onclick="closeWinModal()">
+      <button class="btn btn-primary" id="win-modal-btn">
         <i class="fas fa-undo"></i> Back to Lobby
       </button>
     </div>
@@ -799,23 +843,25 @@ body::before{
 <script>
 'use strict';
 // ═══════════════════════════════════════════════════════════════
-// ██████  CONFIG  ██████
+// CONFIG
 // ═══════════════════════════════════════════════════════════════
 const CFG = {
   SUPABASE_URL:      'https://hfxagwcwaalrmaqzhyfj.supabase.co',
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmeGFnd2N3YWFscm1hcXpoeWZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MzY5NzIsImV4cCI6MjA5MDIxMjk3Mn0.LMFfFRmqW34PT70zAOTj4zsUWmrDl_P4MXL0wZBkxYc',
   DISCORD_CLIENT_ID: '1487252546060947476',
   CARD_PATH: './',
+  TURN_SECONDS: 25,
+  AI_THINK_MIN: 900,
+  AI_THINK_MAX: 2800,
 };
 
 // ═══════════════════════════════════════════════════════════════
-// ANIMATED BACKGROUND — floating orbs + particle sparks
+// ANIMATED BACKGROUND
 // ═══════════════════════════════════════════════════════════════
 (function initBg() {
   const canvas = document.getElementById('bg-canvas');
   const ctx = canvas.getContext('2d');
   let W, H;
-
   const ORB_CONFIGS = [
     { x:.15, y:.8,  r:260, color:'rgba(124,58,237,', speed:.0004, drift:.0003 },
     { x:.85, y:.2,  r:220, color:'rgba(88,101,242,',  speed:.0003, drift:.0005 },
@@ -823,83 +869,48 @@ const CFG = {
     { x:.1,  y:.1,  r:150, color:'rgba(232,48,44,',   speed:.0006, drift:.0004 },
   ];
   const orbs = ORB_CONFIGS.map(c => ({
-    ...c,
-    ox: 0, oy: 0,
+    ...c, ox:0, oy:0,
     angle1: Math.random() * Math.PI * 2,
     angle2: Math.random() * Math.PI * 2,
   }));
-
-  // Particles
   const PARTICLE_COUNT = 38;
   const particles = Array.from({ length: PARTICLE_COUNT }, () => spawnParticle(true));
-
   function spawnParticle(random) {
     return {
       x: Math.random() * (W || window.innerWidth),
       y: random ? Math.random() * (H || window.innerHeight) : (H || window.innerHeight) + 10,
-      vy: -(0.3 + Math.random() * 0.8),
-      vx: (Math.random() - 0.5) * 0.4,
-      size: 1 + Math.random() * 2.5,
-      opacity: 0,
+      vy: -(0.3 + Math.random() * 0.8), vx: (Math.random() - 0.5) * 0.4,
+      size: 1 + Math.random() * 2.5, opacity: 0,
       maxOp: 0.15 + Math.random() * 0.35,
       color: ['rgba(165,180,252,', 'rgba(196,181,253,', 'rgba(249,192,35,'][Math.floor(Math.random()*3)],
-      life: 0,
-      maxLife: 120 + Math.random() * 200,
+      life: 0, maxLife: 120 + Math.random() * 200,
     };
   }
-
-  function resize() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-  }
+  function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
   window.addEventListener('resize', resize);
   resize();
-
   let t = 0;
   function draw() {
-    ctx.clearRect(0, 0, W, H);
-    t++;
-
-    // Draw orbs
+    ctx.clearRect(0, 0, W, H); t++;
     orbs.forEach(o => {
-      o.angle1 += o.speed;
-      o.angle2 += o.drift;
+      o.angle1 += o.speed; o.angle2 += o.drift;
       o.ox = Math.sin(o.angle1) * W * 0.08;
       o.oy = Math.cos(o.angle2) * H * 0.08;
-      const cx = o.x * W + o.ox;
-      const cy = o.y * H + o.oy;
+      const cx = o.x * W + o.ox, cy = o.y * H + o.oy;
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, o.r);
-      grad.addColorStop(0,   o.color + '0.09)');
+      grad.addColorStop(0, o.color + '0.09)');
       grad.addColorStop(0.4, o.color + '0.05)');
-      grad.addColorStop(1,   o.color + '0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, o.r, 0, Math.PI * 2);
-      ctx.fill();
+      grad.addColorStop(1, o.color + '0)');
+      ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(cx, cy, o.r, 0, Math.PI * 2); ctx.fill();
     });
-
-    // Draw particles
     particles.forEach((p, i) => {
-      p.life++;
-      p.x += p.vx;
-      p.y += p.vy;
-      // Fade in/out
+      p.life++; p.x += p.vx; p.y += p.vy;
       const half = p.maxLife / 2;
-      p.opacity = p.life < half
-        ? (p.life / half) * p.maxOp
-        : ((p.maxLife - p.life) / half) * p.maxOp;
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fillStyle = p.color + p.opacity + ')';
-      ctx.fill();
-
-      if (p.life >= p.maxLife || p.y < -10) {
-        particles[i] = spawnParticle(false);
-        particles[i].x = Math.random() * W;
-      }
+      p.opacity = p.life < half ? (p.life / half) * p.maxOp : ((p.maxLife - p.life) / half) * p.maxOp;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = p.color + p.opacity + ')'; ctx.fill();
+      if (p.life >= p.maxLife || p.y < -10) { particles[i] = spawnParticle(false); particles[i].x = Math.random() * W; }
     });
-
     requestAnimationFrame(draw);
   }
   draw();
@@ -908,23 +919,30 @@ const CFG = {
 // ═══════════════════════════════════════════════════════════════
 // GLOBALS
 // ═══════════════════════════════════════════════════════════════
-let SB      = null;
-let CH      = null;
-let discordSdk = null;
-
+let SB = null, CH = null, discordSdk = null;
 let MY_ID   = crypto.randomUUID().slice(0,8);
 let MY_NAME = '';
-
 let isHost  = false;
 let roomCode = '';
 let gameType = '';
-
+let isAiMode = false;
 let lobbyPlayers = {};
 let G = null;
 let selectedIdx = null;
 
+// ── Turn timer ──
+let _turnTimerInterval = null;
+let _turnTimerRemaining = 0;
+const TURN_SECONDS = CFG.TURN_SECONDS;
+const RING_CIRC = 50.26; // 2π * 8
+
+// ── AI player IDs prefix ──
+const AI_ID_PREFIX = 'ai_';
+const AI_NAMES = ['Aria','Blaze','Cleo','Dex','Ember','Flux'];
+const AI_COLORS = ['#818cf8','#f59e0b','#ec4899','#22c55e','#38bdf8','#f87171'];
+
 // ═══════════════════════════════════════════════════════════════
-// CARD CONSTANTS & HELPERS
+// CARD CONSTANTS
 // ═══════════════════════════════════════════════════════════════
 const CARD_COLORS  = ['red','blue','green','yellow'];
 const COLOR_PREFIX = { red:'R', blue:'B', green:'G', yellow:'Y' };
@@ -939,14 +957,12 @@ function cardFilename({ color, value }) {
   const V = VALUE_SUFFIX[value]  ?? value;
   return C + V + '.png';
 }
-
 function cardLabel({ color, value }) {
   if (value === 'wild' || value === 'wild4') return VALUE_LABEL[value] || value;
   const c = color.charAt(0).toUpperCase() + color.slice(1);
   const v = VALUE_LABEL[value] || value;
   return `${c} ${v}`;
 }
-
 function isPlayable(card) {
   if (!G || !G.started || !isMyTurn()) return false;
   if (G.drawStack > 0) {
@@ -956,12 +972,19 @@ function isPlayable(card) {
   if (card.color === 'black') return true;
   return card.color === G.topColor || card.value === G.topCard.value;
 }
-
+function isAiPlayable(card, topCard, topColor, drawStack) {
+  if (drawStack > 0) {
+    if (topCard.value === 'draw2')  return card.value === 'draw2';
+    if (topCard.value === 'wild4')  return card.value === 'wild4';
+  }
+  if (card.color === 'black') return true;
+  return card.color === topColor || card.value === topCard.value;
+}
 function isMyTurn() {
   if (!G || !G.started) return false;
   return G.turnOrder[G.currentTurnIdx] === MY_ID;
 }
-
+function isAiId(id) { return typeof id === 'string' && id.startsWith(AI_ID_PREFIX); }
 function currentTurnName() {
   if (!G) return '';
   const id = G.turnOrder[G.currentTurnIdx];
@@ -986,7 +1009,6 @@ function buildDeck() {
   }
   return deck;
 }
-
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -1005,14 +1027,12 @@ function cardEl(card, { w=56, h=84, idx=-1, inHand=false, isDiscard=false } = {}
     (inHand ? ' clickable' : '') +
     (inHand && idx === selectedIdx ? ' selected' : '') +
     (inHand && isPlayable(card) ? ' playable' : '');
-  wrap.style.cssText = `display:inline-block;`;
-
+  wrap.style.cssText = 'display:inline-block;';
   const img = document.createElement('img');
   img.src   = CFG.CARD_PATH + cardFilename(card);
   img.alt   = cardLabel(card);
   img.style.cssText = `width:${w}px;height:${h}px;`;
   if (isDiscard) img.classList.add('card-play-anim');
-
   img.onerror = function() {
     this.style.display = 'none';
     const fb = document.createElement('div');
@@ -1022,13 +1042,9 @@ function cardEl(card, { w=56, h=84, idx=-1, inHand=false, isDiscard=false } = {}
     wrap.appendChild(fb);
   };
   wrap.appendChild(img);
-
-  if (inHand) {
-    wrap.addEventListener('click', () => selectCard(idx));
-  }
+  if (inHand) wrap.addEventListener('click', () => selectCard(idx));
   return wrap;
 }
-
 function cardBackEl(w=62, h=93) {
   const div = document.createElement('div');
   div.className = 'card-back-css';
@@ -1042,11 +1058,16 @@ function cardBackEl(w=62, h=93) {
 // ═══════════════════════════════════════════════════════════════
 function initSupabase() {
   if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) {
-    console.warn('Supabase not configured — multiplayer disabled.');
+    console.warn('Supabase not configured.');
     return false;
   }
-  SB = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
-  return true;
+  try {
+    SB = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+    return true;
+  } catch(e) {
+    console.warn('Supabase init error:', e);
+    return false;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1055,11 +1076,9 @@ function initSupabase() {
 async function setupChannel(code) {
   if (CH) { await SB.removeChannel(CH); CH = null; }
   if (!SB) return;
-
   CH = SB.channel(`uno-room-${code}`, {
     config: { broadcast: { self: true }, presence: { key: MY_ID } }
   });
-
   CH.on('presence', { event: 'sync' }, () => {
     const state = CH.presenceState();
     lobbyPlayers = {};
@@ -1070,11 +1089,9 @@ async function setupChannel(code) {
     updateLobbyUI();
     if (G && G.started) updatePlayerChips();
   });
-
   CH.on('presence', { event: 'join' }, ({ key, newPresences }) => {
     if (newPresences[0]) showToast(`${newPresences[0].name} joined`, 'fa-user-plus');
   });
-
   CH.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
     if (leftPresences[0]) showToast(`${leftPresences[0].name} left`, 'fa-user-minus');
     if (G && G.started && G.players[key]) {
@@ -1086,21 +1103,17 @@ async function setupChannel(code) {
       }
     }
   });
-
   CH.on('broadcast', { event: 'game_state' }, ({ payload }) => {
     if (isHost) return;
     applyStateUpdate(payload);
   });
-
   CH.on('broadcast', { event: 'game_action' }, ({ payload }) => {
     if (!isHost) return;
     processAction(payload);
   });
-
   CH.on('broadcast', { event: 'tod_action' }, ({ payload }) => {
     applyTodAction(payload);
   });
-
   await CH.subscribe(async (status) => {
     if (status === 'SUBSCRIBED') {
       await CH.track({ id: MY_ID, name: MY_NAME, isHost });
@@ -1112,7 +1125,6 @@ function broadcast(event, payload) {
   if (!CH) return;
   CH.send({ type:'broadcast', event, payload });
 }
-
 function broadcastFullState() {
   if (!isHost || !CH) return;
   broadcast('game_state', {
@@ -1132,12 +1144,10 @@ function broadcastFullState() {
     hands:          G.hands,
   });
 }
-
 function applyStateUpdate(payload) {
   if (!G) G = {};
   Object.assign(G, payload);
   if (G.hands && G.hands[MY_ID]) G.myHand = G.hands[MY_ID];
-  // Handle screen switch signal
   if (payload.screenSwitch === 'uno') showScreen('screen-uno');
   renderGame();
 }
@@ -1152,19 +1162,17 @@ function openLobby(type) {
     : '<i class="fas fa-bullseye"></i>';
   document.getElementById('lobby-title').innerHTML = `${icon} ${type === 'uno' ? 'UNO Lobby' : 'ToD Lobby'}`;
   showScreen('screen-lobby');
-  document.getElementById('lobby-name-box').style.display   = '';
-  document.getElementById('lobby-room-box').style.display   = 'none';
+  document.getElementById('lobby-name-box').style.display = '';
+  document.getElementById('lobby-room-box').style.display = 'none';
   document.getElementById('lobby-waiting-box').style.display = 'none';
   document.getElementById('inp-name').value = MY_NAME || '';
   document.getElementById('btn-confirm-name').disabled = !MY_NAME;
   if (MY_NAME) confirmName();
 }
-
 function onNameInput() {
   const v = document.getElementById('inp-name').value.trim();
   document.getElementById('btn-confirm-name').disabled = v.length < 1;
 }
-
 function confirmName() {
   const v = document.getElementById('inp-name').value.trim();
   if (!v) return;
@@ -1172,35 +1180,32 @@ function confirmName() {
   document.getElementById('lobby-name-box').style.display = 'none';
   document.getElementById('lobby-room-box').style.display = '';
 }
-
 function genRoomCode() {
   return Array.from(crypto.getRandomValues(new Uint8Array(3)))
     .map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b & 31]).join('');
 }
-
 async function createRoom() {
   roomCode = genRoomCode();
   isHost = true;
+  isAiMode = false;
   await _enterRoom();
   document.getElementById('room-code-display').style.display = '';
   document.getElementById('room-code-text').textContent = roomCode;
   document.getElementById('btn-start-game').style.display = '';
   document.getElementById('lobby-waiting-msg').style.display = 'none';
 }
-
 async function joinRoom() {
   const code = document.getElementById('inp-room-code').value.trim().toUpperCase();
   if (code.length < 3) { showToast('Enter a room code first', 'fa-exclamation-triangle'); return; }
   roomCode = code;
   isHost = false;
+  isAiMode = false;
   await _enterRoom();
 }
-
 async function _enterRoom() {
   document.getElementById('lobby-room-box').style.display   = 'none';
   document.getElementById('lobby-waiting-box').style.display = '';
   document.getElementById('lobby-player-count').textContent = '1 player';
-
   if (SB) {
     await setupChannel(roomCode);
   } else {
@@ -1213,14 +1218,32 @@ async function _enterRoom() {
   }
 }
 
+function startAiGame() {
+  isAiMode = true;
+  isHost = true;
+  roomCode = 'AI_' + genRoomCode();
+  const aiCount = parseInt(document.getElementById('ai-count-select').value, 10) || 2;
+  // Build lobbyPlayers with human + AI
+  lobbyPlayers = {};
+  lobbyPlayers[MY_ID] = { id:MY_ID, name:MY_NAME, isHost:true };
+  for (let i = 0; i < aiCount; i++) {
+    const aiId = AI_ID_PREFIX + i;
+    lobbyPlayers[aiId] = { id:aiId, name:AI_NAMES[i] || `AI-${i+1}`, isHost:false, isAi:true };
+  }
+  const playerIds = Object.keys(lobbyPlayers);
+  initGameState(playerIds);
+  showScreen('screen-uno');
+  document.getElementById('ai-mode-badge').style.display = '';
+  renderGame();
+  startTurnTimer(); // start timer right away
+}
+
 function updateLobbyUI() {
   const list = document.getElementById('lobby-player-list');
   list.innerHTML = '';
   const ids = Object.keys(lobbyPlayers);
-
   document.getElementById('lobby-player-count').textContent =
     ids.length + ' player' + (ids.length !== 1 ? 's' : '');
-
   const BG_COLORS = ['#5865F2','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
   ids.forEach((id, i) => {
     const p = lobbyPlayers[id];
@@ -1232,10 +1255,10 @@ function updateLobbyUI() {
       <div class="lp-name">${p.name}</div>
       ${p.isHost ? '<span class="lp-badge host">HOST</span>' : ''}
       ${id === MY_ID ? '<span class="lp-badge you">YOU</span>' : ''}
+      ${p.isAi ? '<span class="lp-badge ai-badge"><i class="fas fa-robot" style="font-size:8px;"></i> AI</span>' : ''}
     `;
     list.appendChild(item);
   });
-
   if (isHost) {
     const btn = document.getElementById('btn-start-game');
     btn.disabled = ids.length < 2;
@@ -1257,20 +1280,23 @@ async function startGame() {
   }
   initGameState(playerIds);
   showScreen('screen-uno');
+  document.getElementById('ai-mode-badge').style.display = 'none';
   renderGame();
-  // Broadcast full state WITH screenSwitch signal so all clients switch screens
   broadcast('game_state', { ...getSerializableState(), screenSwitch:'uno' });
+  startTurnTimer();
 }
 
 function leaveLobby() {
+  stopTurnTimer();
   if (CH) { SB?.removeChannel(CH); CH = null; }
   roomCode = '';
   isHost = false;
+  isAiMode = false;
   G = null;
   selectedIdx = null;
+  document.getElementById('ai-mode-badge').style.display = 'none';
   showScreen('screen-launcher');
 }
-
 function confirmLeaveGame() {
   if (confirm('Leave the game?')) leaveLobby();
 }
@@ -1286,19 +1312,20 @@ function initGameState(playerIds) {
 
   for (let i = 0; i < playerIds.length; i++) {
     const id = playerIds[i];
-    hands[id]   = deck.splice(0, 7);
+    hands[id] = deck.splice(0, 7);
+    const pData = lobbyPlayers[id];
     players[id] = {
-      name: lobbyPlayers[id]?.name || `P${i+1}`,
+      name: pData?.name || `P${i+1}`,
       cardCount: 7,
       score: 0,
       connected: true,
-      color: BG[i % BG.length],
+      isAi: !!pData?.isAi,
+      color: isAiId(id) ? AI_COLORS[parseInt(id.replace(AI_ID_PREFIX,''),10) % AI_COLORS.length] : BG[i % BG.length],
     };
   }
 
   let topCard;
   do { topCard = deck.shift(); } while (topCard.color === 'black');
-
   const turnOrder = shuffle([...playerIds]);
 
   G = {
@@ -1339,7 +1366,6 @@ function getSerializableState() {
 
 function processAction({ type, playerId, card, chosenColor }) {
   if (!G || !isHost) return;
-
   if (type === 'play_card') {
     if (G.hands[playerId]) {
       const idx = G.hands[playerId].findIndex(c => c.color===card.color && c.value===card.value);
@@ -1349,10 +1375,9 @@ function processAction({ type, playerId, card, chosenColor }) {
     G.topCard  = card;
     G.topColor = chosenColor || card.color;
     addLog(`${G.players[playerId]?.name || 'Player'} played ${cardLabel({ color:G.topColor, value:card.value })}.`,
-      playerId === MY_ID ? 'log-you' : '');
+      isAiId(playerId) ? 'log-ai' : (playerId === MY_ID ? 'log-you' : ''));
     if (checkWin(playerId)) { broadcastFullState(); return; }
     applyCardEffect(card, playerId, chosenColor);
-
   } else if (type === 'draw_card') {
     if (!G.deck.length) reshuffleDeck();
     const drawn = G.deck.splice(0, Math.max(1, G.drawStack));
@@ -1363,29 +1388,38 @@ function processAction({ type, playerId, card, chosenColor }) {
       G.drawStack = 0;
     } else {
       addLog(`${G.players[playerId]?.name || 'Player'} drew a card.`,
-        playerId === MY_ID ? 'log-you' : '');
+        isAiId(playerId) ? 'log-ai' : (playerId === MY_ID ? 'log-you' : ''));
     }
     advanceTurn(1);
-
   } else if (type === 'uno_shout') {
     addLog(`${G.players[playerId]?.name} shouted UNO!`, 'log-warn');
+  } else if (type === 'timer_draw') {
+    // Auto-draw on timer expiry
+    if (!G.deck.length) reshuffleDeck();
+    const drawn = G.deck.splice(0, 1);
+    G.hands[playerId] = [...(G.hands[playerId]||[]), ...drawn];
+    G.players[playerId].cardCount = G.hands[playerId].length;
+    addLog(`⏱ ${G.players[playerId]?.name} ran out of time — drew a card!`, 'log-timer');
+    advanceTurn(1);
   }
-
   if (G.hands && G.hands[MY_ID]) G.myHand = G.hands[MY_ID];
-  broadcastFullState();
+  if (!isAiMode) broadcastFullState();
   renderGame();
+  if (G.started && !G.over) {
+    startTurnTimer();
+    maybeScheduleAiTurn();
+  }
 }
 
 function applyCardEffect(card, playerId, chosenColor) {
   const nextIdx = getNextIdx(1);
   const nextId  = G.turnOrder[nextIdx];
-
   if (card.value === 'skip') {
     addLog(`${G.players[nextId]?.name} was skipped!`, 'log-warn');
     advanceTurn(2);
   } else if (card.value === 'reverse') {
     G.direction *= -1;
-    addLog(`Direction reversed!`, 'log-system');
+    addLog('Direction reversed!', 'log-system');
     advanceTurn(G.turnOrder.length === 2 ? 2 : 1);
   } else if (card.value === 'draw2') {
     G.drawStack += 2;
@@ -1404,31 +1438,187 @@ function getNextIdx(offset) {
   const n = G.turnOrder.length;
   return ((G.currentTurnIdx + G.direction * offset) % n + n) % n;
 }
-
 function advanceTurn(steps) {
   for (let i = 0; i < steps; i++) {
     G.currentTurnIdx = getNextIdx(1);
   }
 }
-
 function checkWin(playerId) {
   if ((G.hands[playerId]?.length ?? 1) === 0) {
     G.over = true;
     G.winner = playerId;
     G.players[playerId].score = (G.players[playerId].score || 0) + 1;
     addLog(`${G.players[playerId]?.name} wins this round!`, 'log-warn');
+    stopTurnTimer();
     return true;
   }
   return false;
 }
-
 function reshuffleDeck() {
   G.deck = shuffle(buildDeck());
 }
-
 function addLog(text, cls='') {
   G.log = G.log || [];
   G.log.push({ text, cls });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TURN TIMER
+// ═══════════════════════════════════════════════════════════════
+function startTurnTimer() {
+  stopTurnTimer();
+  if (!G || !G.started || G.over) return;
+  _turnTimerRemaining = TURN_SECONDS;
+  _updateTimerUI(TURN_SECONDS);
+  document.getElementById('topbar-timer').style.display = '';
+  document.getElementById('hand-timer-bar').classList.add('visible');
+
+  _turnTimerInterval = setInterval(() => {
+    _turnTimerRemaining--;
+    _updateTimerUI(_turnTimerRemaining);
+    if (_turnTimerRemaining <= 0) {
+      stopTurnTimer();
+      onTimerExpired();
+    }
+  }, 1000);
+}
+
+function stopTurnTimer() {
+  clearInterval(_turnTimerInterval);
+  _turnTimerInterval = null;
+  document.getElementById('topbar-timer').style.display = 'none';
+  document.getElementById('hand-timer-bar').classList.remove('visible');
+}
+
+function _updateTimerUI(secs) {
+  const timerEl = document.getElementById('topbar-timer');
+  const numEl   = document.getElementById('topbar-timer-num');
+  const ringFg  = document.getElementById('timer-ring-fg');
+  const barFill = document.getElementById('hand-timer-fill');
+
+  numEl.textContent = Math.max(0, secs);
+  const frac = secs / TURN_SECONDS;
+  const dashOffset = RING_CIRC * (1 - frac);
+  ringFg.style.strokeDashoffset = dashOffset;
+
+  // Color classes
+  timerEl.classList.remove('warn','crit');
+  barFill.classList.remove('warn','crit');
+  if (secs <= 5) {
+    timerEl.classList.add('crit');
+    barFill.classList.add('crit');
+  } else if (secs <= 10) {
+    timerEl.classList.add('warn');
+    barFill.classList.add('warn');
+  }
+
+  // Progress bar
+  barFill.style.width = Math.max(0, frac * 100) + '%';
+}
+
+function onTimerExpired() {
+  if (!G || G.over) return;
+  const curId = G.turnOrder[G.currentTurnIdx];
+
+  // If it's AI's turn this shouldn't happen (AI takes its turn), but safety guard
+  if (isAiId(curId)) return;
+
+  if (curId === MY_ID) {
+    showToast("⏱ Time's up! Auto-drew a card.", 'fa-clock');
+    if (isHost) {
+      processAction({ type:'timer_draw', playerId:MY_ID });
+    } else {
+      broadcast('game_action', { type:'timer_draw', playerId:MY_ID });
+      renderGame();
+    }
+  } else if (isHost) {
+    // Host handles timer for remote players too
+    processAction({ type:'timer_draw', playerId:curId });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AI ENGINE
+// ═══════════════════════════════════════════════════════════════
+let _aiThinkTimeout = null;
+
+function maybeScheduleAiTurn() {
+  if (!isAiMode || !G || !G.started || G.over) return;
+  const curId = G.turnOrder[G.currentTurnIdx];
+  if (!isAiId(curId)) return;
+
+  clearTimeout(_aiThinkTimeout);
+  const thinkMs = CFG.AI_THINK_MIN + Math.random() * (CFG.AI_THINK_MAX - CFG.AI_THINK_MIN);
+  renderAiThinking(curId, true);
+  _aiThinkTimeout = setTimeout(() => {
+    renderAiThinking(curId, false);
+    executeAiTurn(curId);
+  }, thinkMs);
+}
+
+function renderAiThinking(aiId, thinking) {
+  // Update the player chip to show thinking indicator
+  const chips = document.getElementById('uno-players')?.children;
+  if (!chips) return;
+  // Re-render will handle this via renderPlayers
+  renderPlayers();
+}
+
+function executeAiTurn(aiId) {
+  if (!G || G.over) return;
+  const hand = G.hands[aiId] || [];
+  const playable = hand.filter(c => isAiPlayable(c, G.topCard, G.topColor, G.drawStack));
+
+  if (playable.length === 0) {
+    // Draw a card
+    processAction({ type:'draw_card', playerId:aiId });
+    if (hand.length === 1) {
+      // AI calls UNO
+      setTimeout(() => {
+        showToast(`${G.players[aiId]?.name} says UNO!`, 'fa-robot');
+        addLog(`${G.players[aiId]?.name} shouted UNO!`, 'log-ai');
+        renderLog();
+      }, 400);
+    }
+    return;
+  }
+
+  // Simple AI strategy: prefer action cards, then match color, then match value, last resort wild
+  let chosen = null;
+
+  // 1. Prefer cards that match the current color (and are action cards)
+  const actionValues = ['skip','reverse','draw2','wild4'];
+  for (const v of actionValues) {
+    const found = playable.find(c => c.value === v && c.color === G.topColor);
+    if (found) { chosen = found; break; }
+  }
+  // 2. Match color
+  if (!chosen) chosen = playable.find(c => c.color === G.topColor);
+  // 3. Match value
+  if (!chosen) chosen = playable.find(c => c.value === G.topCard.value);
+  // 4. Wild
+  if (!chosen) chosen = playable.find(c => c.color === 'black');
+  // 5. Any
+  if (!chosen) chosen = playable[0];
+
+  // For wilds, pick the most common color in hand
+  let chosenColor = null;
+  if (chosen.color === 'black') {
+    const colorCounts = { red:0, blue:0, green:0, yellow:0 };
+    for (const c of hand) if (CARD_COLORS.includes(c.color)) colorCounts[c.color]++;
+    chosenColor = Object.entries(colorCounts).sort((a,b) => b[1]-a[1])[0][0];
+  }
+
+  // Check UNO before playing
+  if (hand.length === 2) {
+    setTimeout(() => {
+      showToast(`${G.players[aiId]?.name} says UNO!`, 'fa-robot');
+      addLog(`${G.players[aiId]?.name} shouted UNO!`, 'log-ai');
+      renderLog();
+    }, 400);
+  }
+
+  processAction({ type:'play_card', playerId:aiId, card:chosen, chosenColor });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1453,6 +1643,7 @@ function playSelected() {
 }
 
 function executePlay(card, idx, chosenColor) {
+  stopTurnTimer(); // Stop timer on human play
   G.myHand.splice(idx, 1);
   if (G.hands[MY_ID]) G.hands[MY_ID] = [...G.myHand];
   selectedIdx = null;
@@ -1462,17 +1653,20 @@ function executePlay(card, idx, chosenColor) {
   } else {
     broadcast('game_action', { type:'play_card', playerId:MY_ID, card, chosenColor });
     renderGame();
+    startTurnTimer();
   }
 }
 
 function drawCardAction() {
   if (!isMyTurn()) { showToast('Not your turn!', 'fa-hourglass-half'); return; }
+  stopTurnTimer();
   selectedIdx = null;
   if (isHost) {
     processAction({ type:'draw_card', playerId:MY_ID });
   } else {
     broadcast('game_action', { type:'draw_card', playerId:MY_ID });
     renderGame();
+    startTurnTimer();
   }
 }
 
@@ -1497,6 +1691,17 @@ function shoutUno() {
 
 function closeWinModal() {
   document.getElementById('win-modal').classList.remove('show');
+  stopTurnTimer();
+  if (isAiMode) {
+    // In AI mode, restart goes back to lobby with AI config shown
+    G.over = false;
+    showScreen('screen-lobby');
+    document.getElementById('lobby-room-box').style.display = '';
+    document.getElementById('lobby-waiting-box').style.display = 'none';
+    document.getElementById('lobby-name-box').style.display = 'none';
+    isAiMode = false;
+    return;
+  }
   G.over = false;
   showScreen('screen-lobby');
   document.getElementById('lobby-room-box').style.display = 'none';
@@ -1532,22 +1737,34 @@ function renderPlayers() {
   container.innerHTML = '';
   const myTurn = isMyTurn();
   const curTurnId = G.turnOrder[G.currentTurnIdx];
+  const isAiTurnNow = isAiId(curTurnId);
 
   G.turnOrder.forEach(id => {
     const p = G.players[id];
     if (!p) return;
     const chip = document.createElement('div');
     const isMe = id === MY_ID;
+    const isAiP = isAiId(id);
+    const isActive = id === curTurnId;
+
     chip.className = 'player-chip' +
+      (isAiP ? ' ai-chip' : '') +
       (isMe && myTurn ? ' active-player' : '') +
-      (!isMe && id === curTurnId ? ' other-active-player' : '');
+      (!isMe && isActive ? ' other-active-player' : '');
+
+    const cardCountDisplay = isMe ? G.myHand.length : (p.cardCount ?? 0);
+    const thinkingHtml = isAiP && isActive && !G.over
+      ? `<div class="ai-thinking-chip"><i class="fas fa-robot" style="font-size:8px;color:var(--ai-color);"></i><span>Thinking</span><div class="ai-dots"><span></span><span></span><span></span></div></div>`
+      : '';
+    const nameDisplay = isMe ? 'You' : p.name;
     chip.innerHTML = `
       <div class="player-avatar" style="background:${p.color}">
-        ${(p.name||'?').slice(0,1).toUpperCase()}
-        <div class="card-count-badge">${isMe ? G.myHand.length : (p.cardCount ?? 0)}</div>
+        ${isAiP ? '<i class="fas fa-robot" style="font-size:14px;"></i>' : (p.name||'?').slice(0,1).toUpperCase()}
+        <div class="card-count-badge">${cardCountDisplay}</div>
       </div>
-      <div class="player-name">${isMe ? 'You' : p.name}</div>
+      <div class="player-name">${nameDisplay}</div>
       <div class="player-score">Score: ${p.score || 0}</div>
+      ${thinkingHtml}
     `;
     container.appendChild(chip);
   });
@@ -1582,9 +1799,15 @@ function renderLog() {
 
 function renderTurnState() {
   const ind = document.getElementById('turn-indicator');
+  const curId = G.turnOrder[G.currentTurnIdx];
+  const isAiTurn = isAiId(curId);
+
   if (isMyTurn()) {
     ind.innerHTML = `<i class="fas fa-bolt"></i> ${G.drawStack > 0 ? `Draw ${G.drawStack} or stack!` : 'Your turn!'}`;
     ind.className = 'turn-indicator is-your-turn';
+  } else if (isAiTurn) {
+    ind.innerHTML = `<i class="fas fa-robot"></i> ${currentTurnName()} is thinking…`;
+    ind.className = 'turn-indicator';
   } else {
     ind.innerHTML = `<i class="fas fa-hourglass-half"></i> ${currentTurnName()}'s turn…`;
     ind.className = 'turn-indicator';
@@ -1596,7 +1819,6 @@ function updateActiveColorLabel() {
   if (!G || !G.topColor) { lbl.innerHTML = ''; return; }
   lbl.innerHTML = `<span class="active-color-dot" style="background:${COLOR_DOT[G.topColor]};"></span>`;
 }
-
 function updatePlayerChips() {
   if (G && G.started) renderPlayers();
 }
@@ -1604,11 +1826,12 @@ function updatePlayerChips() {
 function showWinModal(winnerId) {
   const p = G.players[winnerId];
   const isMe = winnerId === MY_ID;
+  const isAiWinner = isAiId(winnerId);
   const icon = document.getElementById('win-icon');
-  icon.className = isMe ? 'fas fa-trophy win-icon' : 'fas fa-star win-icon';
-  icon.style.color = isMe ? 'var(--uno-yellow)' : '#a78bfa';
-  document.getElementById('win-title').textContent   = isMe ? 'You Win!' : `${p?.name || 'Player'} Wins!`;
-  document.getElementById('win-subtitle').textContent = isMe ? 'Great play!' : 'Better luck next round!';
+  icon.className = isMe ? 'fas fa-trophy win-icon' : (isAiWinner ? 'fas fa-robot win-icon' : 'fas fa-star win-icon');
+  icon.style.color = isMe ? 'var(--uno-yellow)' : (isAiWinner ? 'var(--ai-color)' : '#a78bfa');
+  document.getElementById('win-title').textContent   = isMe ? 'You Win! 🎉' : `${p?.name || 'Player'} Wins!`;
+  document.getElementById('win-subtitle').textContent = isMe ? 'Great play!' : (isAiWinner ? 'The AI beat you this time!' : 'Better luck next round!');
   document.getElementById('win-modal').classList.add('show');
 }
 
@@ -1626,6 +1849,11 @@ const TRUTHS = [
   "What's the most childish thing you still do?",
   "What's a secret you've never told anyone in this call?",
   "What's the most trouble you've ever been in?",
+  "Have you ever ghosted someone you actually liked?",
+  "What's the biggest lie you've told and gotten away with?",
+  "What's a habit you have that you'd never admit in person?",
+  "Who here would you most want to swap lives with for a week?",
+  "What's the most cringe thing on your phone right now?",
 ];
 const DARES = [
   "Send a compliment to the 3rd person in your contact list — right now.",
@@ -1636,6 +1864,8 @@ const DARES = [
   "Write a 2-sentence love poem about the player to your left.",
   "Do your best impression of another player until they guess who you are.",
   "Send your most recent camera roll photo to the group.",
+  "Tell everyone your most recent search history item.",
+  "Sing the chorus of the last song stuck in your head.",
 ];
 
 const todState = {
@@ -1676,8 +1906,8 @@ function renderTod() {
   document.getElementById('tod-choice-btns').style.display = 'none';
   document.getElementById('tod-prompt-area').innerHTML = '';
   const icon = document.getElementById('wheel-icon');
-  if (icon) { icon.className = 'fas fa-bullseye'; }
-  document.getElementById('wheel-label').textContent  = 'Spin!';
+  if (icon) icon.className = 'fas fa-bullseye';
+  document.getElementById('wheel-label').textContent = 'Spin!';
   todState.spun = false;
 }
 
@@ -1721,14 +1951,16 @@ function showPrompt(type) {
       <div class="prompt-type">${iconHtml}</div>
       <div class="prompt-text">${prompt}</div>
       <div class="prompt-actions">
-        <button class="prompt-action-btn btn-complete" onclick="completePrompt()">
+        <button class="prompt-action-btn btn-complete" id="tod-complete-btn">
           <i class="fas fa-check"></i> Done!
         </button>
-        <button class="prompt-action-btn btn-skip" onclick="skipPrompt()">
+        <button class="prompt-action-btn btn-skip" id="tod-skip-btn">
           <i class="fas fa-forward"></i> Skip (−1 pt)
         </button>
       </div>
     </div>`;
+  document.getElementById('tod-complete-btn').addEventListener('click', completePrompt);
+  document.getElementById('tod-skip-btn').addEventListener('click', skipPrompt);
 }
 
 function completePrompt() {
@@ -1737,12 +1969,12 @@ function completePrompt() {
   showToast(`${p.name} completed it! +1`, 'fa-check-circle');
   advanceTod();
 }
-
 function skipPrompt() {
-  showToast('Skipped!', 'fa-forward');
+  const p = todState.players[todState.currentIdx];
+  p.score = Math.max(0, (p.score || 0) - 1);
+  showToast('Skipped! −1 pt', 'fa-forward');
   advanceTod();
 }
-
 function advanceTod() {
   todState.players.forEach(p => p.spotlight = false);
   todState.currentIdx = (todState.currentIdx + 1) % todState.players.length;
@@ -1750,7 +1982,6 @@ function advanceTod() {
   todState.players[todState.currentIdx].spotlight = true;
   setTimeout(() => renderTod(), 700);
 }
-
 function applyTodAction(payload) {
   if (payload.type === 'start_tod' && !isHost) {
     initTodWithPlayers();
@@ -1768,7 +1999,7 @@ function showScreen(id) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TOAST  (accepts optional FA icon class)
+// TOAST
 // ═══════════════════════════════════════════════════════════════
 let _toastTimer;
 function showToast(msg, iconClass='fa-info-circle', ms=2800) {
@@ -1780,44 +2011,11 @@ function showToast(msg, iconClass='fa-info-circle', ms=2800) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// DISCORD ACTIVITY SDK
+// DISCORD SDK
 // ═══════════════════════════════════════════════════════════════
 async function tryInitDiscordSdk() {
   if (!CFG.DISCORD_CLIENT_ID) return null;
   try {
-    /*
-     * WHY BUTTONS DON'T WORK IN DISCORD ACTIVITY (iFrame) but work on the web:
-     *
-     * Discord Activities run inside a sandboxed <iframe>. The iframe has a very
-     * restrictive Content-Security-Policy set by Discord that blocks inline event
-     * handlers (onclick="...") in some contexts AND — more critically — blocks
-     * dynamic ESM imports from external CDNs unless the SDK is loaded via
-     * Discord's own proxy (/.proxy/ path rewriting).
-     *
-     * The most common causes of "buttons not working" inside Discord Activities:
-     *
-     * 1. CSP + inline handlers: Discord's iframe sandbox may block onclick=""
-     *    attributes.  The fix used in this file is to attach all handlers via
-     *    addEventListener so nothing is inline.  (Already applied to card clicks.)
-     *
-     * 2. SDK import from esm.sh blocked by iframe sandbox or CSP.
-     *    Use a local bundle or import from a path proxied by Discord instead.
-     *
-     * 3. The SDK's ready() / authorize() handshake must complete before any user
-     *    interaction is processed.  If it throws, we silently fall through to
-     *    standalone mode here.
-     *
-     * 4. URL path: Discord proxies your activity at
-     *    https://discord.com/activities/<CLIENT_ID>/.proxy/
-     *    All fetch/XHR calls and imports MUST use relative paths so they are
-     *    rewritten through that proxy. Absolute URLs to external CDNs will fail
-     *    with CORS/CSP errors inside the Activity iframe.
-     *
-     * SOLUTION APPLIED HERE:
-     * - The SDK is imported via a relative proxy path that Discord rewrites.
-     * - All critical button handlers are wired with addEventListener (not onclick).
-     * - A DOMContentLoaded guard ensures buttons exist before we attach listeners.
-     */
     const { DiscordSDK } = await import('./.proxy/esm.sh/@discord/embedded-app-sdk@1');
     discordSdk = new DiscordSDK(CFG.DISCORD_CLIENT_ID);
     await discordSdk.ready();
@@ -1831,18 +2029,15 @@ async function tryInitDiscordSdk() {
     console.log('Discord Activity SDK initialized', code);
     return discordSdk;
   } catch (e) {
-    console.log('Discord SDK not available — running in standalone mode', e?.message || e);
+    console.log('Discord SDK not available — running standalone', e?.message || e);
     return null;
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// BUTTON LISTENER WIRING  (fixes Discord iframe onclick blocking)
+// EVENT WIRING (DOMContentLoaded)
 // ═══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-  // Wire every button that previously used onclick="" via addEventListener.
-  // This is the primary fix for buttons not working inside the Discord iframe
-  // because the sandbox attribute can block inline event handlers.
   const wire = (sel, fn) => document.querySelector(sel)?.addEventListener('click', fn);
 
   // Launcher cards
@@ -1850,21 +2045,33 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('click', () => openLobby('uno')));
   document.querySelectorAll('.activity-card.tod-card').forEach(el =>
     el.addEventListener('click', () => openLobby('tod')));
-
-  // Launch buttons (stop propagation already handled by checking gameType)
   document.querySelectorAll('.uno-card .launch-btn').forEach(el =>
     el.addEventListener('click', e => { e.stopPropagation(); openLobby('uno'); }));
   document.querySelectorAll('.tod-card .launch-btn').forEach(el =>
     el.addEventListener('click', e => { e.stopPropagation(); openLobby('tod'); }));
 
   // Lobby
-  wire('#btn-confirm-name',  confirmName);
-  wire('#btn-create',        createRoom);
-  wire('#btn-join',          joinRoom);
-  wire('#btn-start-game',    startGame);
+  wire('#btn-confirm-name', confirmName);
+  wire('#btn-create',       createRoom);
+  wire('#btn-join',         joinRoom);
+  wire('#btn-start-game',   startGame);
+  wire('#btn-play-ai',      startAiGame);
 
-  // Topbar back buttons
-  document.querySelectorAll('.back-btn').forEach((btn, i) => {
+  // AI mode toggle
+  const aiToggle = document.getElementById('ai-mode-toggle');
+  aiToggle?.addEventListener('change', () => {
+    const on = aiToggle.checked;
+    document.getElementById('ai-count-row').style.display = on ? '' : 'none';
+    document.getElementById('btn-play-ai').style.display = on ? '' : 'none';
+    document.getElementById('btn-create').style.display = on ? 'none' : '';
+    document.getElementById('btn-join').style.display = on ? 'none' : '';
+    // Hide join/join-related UI when in AI mode
+    const joinLabel = document.querySelector('.lobby-divider:last-of-type');
+    if (joinLabel) joinLabel.style.display = on ? 'none' : '';
+  });
+
+  // Back buttons
+  document.querySelectorAll('.back-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const screen = btn.closest('.screen');
       if (screen?.id === 'screen-uno') confirmLeaveGame();
@@ -1872,19 +2079,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // UNO game buttons
-  wire('#play-btn',       playSelected);
-  wire('.uno-shout-btn',  shoutUno);
-  wire('.draw-pile-btn',  drawCardAction);
+  // UNO buttons
+  wire('#play-btn',      playSelected);
+  wire('#uno-shout-btn', shoutUno);
+  wire('#draw-pile-btn', drawCardAction);
 
   // Color picker
   document.querySelectorAll('.color-pick-btn').forEach(btn => {
-    const colorMap = {
-      'cpb-red':    'red',
-      'cpb-blue':   'blue',
-      'cpb-yellow': 'yellow',
-      'cpb-green':  'green',
-    };
+    const colorMap = { 'cpb-red':'red', 'cpb-blue':'blue', 'cpb-yellow':'yellow', 'cpb-green':'green' };
     for (const [cls, color] of Object.entries(colorMap)) {
       if (btn.classList.contains(cls)) {
         btn.addEventListener('click', () => pickColor(color));
@@ -1894,7 +2096,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Win modal
-  wire('#win-modal .btn-primary', closeWinModal);
+  wire('#win-modal-btn', closeWinModal);
 
   // ToD wheel
   wire('#tod-wheel', spinWheel);
@@ -1903,12 +2105,17 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.tod-dare-btn').forEach(b =>
     b.addEventListener('click', () => chooseTod('dare')));
 
-  // Name input enter key
+  // Keyboard shortcuts
   document.getElementById('inp-name')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') confirmName();
   });
   document.getElementById('inp-room-code')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') joinRoom();
+  });
+  document.getElementById('inp-name')?.addEventListener('input', onNameInput);
+  document.getElementById('inp-room-code')?.addEventListener('input', () => {
+    const el = document.getElementById('inp-room-code');
+    el.value = el.value.toUpperCase();
   });
 });
 
