@@ -2192,7 +2192,7 @@ function applyCardEffect(card, playerId, chosenColor, swapTargetId, allCards) {
   } else {
     advanceTurn(1);
   }
-
+}
 function checkWin(playerId) {
   if (!G.hands[playerId] || G.hands[playerId].length > 0) return false;
   G.over = true;
