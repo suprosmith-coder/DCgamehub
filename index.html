@@ -941,8 +941,35 @@ body::before{
         </div>
       </div>
       <div id="browser-room-section" style="display:none;flex-direction:column;gap:12px;">
+        <!-- ── Solo AI Quick Launch ── -->
+        <div style="background:rgba(129,140,248,.07);border:1px solid rgba(129,140,248,.22);border-radius:14px;padding:14px 16px;">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--ai-color);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+            <i class="fas fa-robot"></i> Solo vs AI
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:140px;">
+              <div style="font-size:11px;font-weight:800;color:var(--muted);margin-bottom:5px;">Game Mode</div>
+              <select id="ai-game-type-select" class="inp" style="cursor:pointer;padding:8px 10px;font-size:12px;">
+                <option value="uno">🃏 UNO</option>
+                <option value="tod">🎯 Truth or Dare</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:140px;" id="ai-opponent-count-wrap">
+              <div style="font-size:11px;font-weight:800;color:var(--muted);margin-bottom:5px;">AI Opponents</div>
+              <select id="browser-ai-count" class="inp" style="cursor:pointer;padding:8px 10px;font-size:12px;">
+                <option value="1">1 opponent</option>
+                <option value="2" selected>2 opponents</option>
+                <option value="3">3 opponents</option>
+                <option value="4">4 opponents</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-ai" id="browser-play-ai-btn" style="width:100%;margin-top:10px;">
+            <i class="fas fa-robot"></i> Play vs AI
+          </button>
+        </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-danger" id="browser-create-btn" style="flex:1;"><i class="fas fa-dice"></i> Create New Lobby</button>
+          <button class="btn btn-danger" id="browser-create-btn" style="flex:1;"><i class="fas fa-dice"></i> Create Multiplayer Lobby</button>
         </div>
         <div class="section-title"><i class="fas fa-door-open"></i> Active Lobbies</div>
         <div id="lobby-cards-grid" class="lobby-cards-grid">
@@ -1197,6 +1224,7 @@ const CFG = {
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmeGFnd2N3YWFscm1hcXpoeWZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MzY5NzIsImV4cCI6MjA5MDIxMjk3Mn0.LMFfFRmqW34PT70zAOTj4zsUWmrDl_P4MXL0wZBkxYc',
   DISCORD_CLIENT_ID: '1487252546060947476',
   CARD_PATH: 'https://suprosmith-coder.github.io/DCgamehub/cards/',
+  GROQ_API_KEY: '',   // 🔑 Paste your Groq API key here
   TURN_SECONDS: 25,
   AI_THINK_MIN: 900,
   AI_THINK_MAX: 2800,
@@ -1772,6 +1800,30 @@ function startAiGame() {
   _afterTurnSetup();
 }
 
+function startAiTod() {
+  const BG = ['#818cf8','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
+  lobbyPlayers = {};
+  lobbyPlayers[MY_ID] = { id:MY_ID, name:MY_NAME, isHost:true };
+  // Add 3 AI "players" as named participants for context-rich prompts
+  const todAiNames = ['Alex','Jordan','Sam'];
+  todAiNames.forEach((name, i) => {
+    const aiId = AI_ID_PREFIX + i;
+    lobbyPlayers[aiId] = { id:aiId, name, isHost:false, isAi:true };
+  });
+  todAiMode = true;
+  initTodWithPlayers();
+  showScreen('screen-tod');
+  // Show AI mode badge in topbar
+  const topbarTitle = document.querySelector('#screen-tod .topbar-title');
+  if (topbarTitle && !document.getElementById('tod-ai-badge')) {
+    const badge = document.createElement('span');
+    badge.id = 'tod-ai-badge';
+    badge.style.cssText = 'background:rgba(129,140,248,.2);border:1px solid rgba(129,140,248,.35);border-radius:8px;padding:2px 8px;font-size:10px;color:var(--ai-color);font-family:\'Nunito\',sans-serif;font-weight:800;margin-left:4px;';
+    badge.innerHTML = '<i class="fas fa-robot" style="font-size:8px;"></i> AI';
+    topbarTitle.appendChild(badge);
+  }
+}
+
 function updateLobbyUI() {
   const list = document.getElementById('lobby-player-list');
   list.innerHTML = '';
@@ -1831,10 +1883,13 @@ function leaveLobby() {
   isHost = false;
   isAiMode = false;
   isSpectator = false;
+  todAiMode = false;
   G = null;
   selectedIndices = [];
   document.getElementById('ai-mode-badge').style.display = 'none';
   document.getElementById('spectator-badge').style.display = 'none';
+  const todBadge = document.getElementById('tod-ai-badge');
+  if (todBadge) todBadge.remove();
   showScreen('screen-launcher');
 }
 function confirmLeaveGame() {
@@ -2595,6 +2650,8 @@ const WILDS = [
 ];
 
 const todState = { players:[], currentIdx:0, round:1, spun:false };
+let todAiMode = false;
+const todPromptHistory = []; // tracks recent prompts to avoid repetition
 
 function initTodWithPlayers() {
   const BG=['#818cf8','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
@@ -2671,23 +2728,72 @@ function spinWheel() {
 
 function chooseTod(type) {
   document.getElementById('tod-choice-btns').style.display = 'none';
+  const cur = todState.players[todState.currentIdx];
+  const useGroq = todAiMode && CFG.GROQ_API_KEY;
   document.getElementById('tod-prompt-area').innerHTML = `
     <div class="ai-thinking">
-      <i class="fas fa-robot" style="color:var(--accent2);"></i>
-      <span>Generating ${type}…</span>
+      <i class="fas fa-${useGroq ? 'robot' : 'dice'}" style="color:var(--accent2);"></i>
+      <span>${useGroq ? 'AI is crafting your ' + type + '…' : 'Picking a ' + type + '…'}</span>
       <div class="ai-thinking-dots"><span></span><span></span><span></span></div>
     </div>`;
-  setTimeout(() => showPrompt(type), 1200);
+  if (useGroq) {
+    generateGroqPrompt(type, cur.name).then(prompt => showPrompt(type, prompt)).catch(() => {
+      // Fallback to static on error
+      showPrompt(type, null);
+    });
+  } else {
+    setTimeout(() => showPrompt(type, null), 1200);
+  }
 }
 
-function showPrompt(type) {
+async function generateGroqPrompt(type, playerName) {
+  const players = todState.players.map(p => p.name).join(', ');
+  const round = todState.round;
+  const recent = todPromptHistory.slice(-4).map(h => `"${h}"`).join(', ');
+  const systemMsg = `You are the host of a fun party game of Truth or Dare being played on Discord. Keep everything PG-13 — fun, a little embarrassing but never offensive, sexual, or harmful. Be creative, specific, and vary your style. Never repeat prompts.`;
+  const userMsg = `Generate ONE ${type} prompt for the player named "${playerName}". 
+Players in the game: ${players}. Round: ${round}.
+${recent ? `Recent prompts used (do NOT repeat these): ${recent}` : ''}
+Rules:
+- Truth: a question they must answer honestly. Make it personal, funny, or revealing.
+- Dare: an action they must perform right now (Discord-friendly, like sending a message, making a voice, sharing a photo, etc).
+- Wild: a rule or challenge that affects ALL players.
+Reply with ONLY the prompt text. No labels, no quotes, no explanation.`;
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${CFG.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'llama3-8b-8192',
+      messages: [
+        { role: 'system', content: systemMsg },
+        { role: 'user', content: userMsg },
+      ],
+      max_tokens: 120,
+      temperature: 1.1,
+    }),
+  });
+  if (!res.ok) throw new Error('Groq error ' + res.status);
+  const data = await res.json();
+  const prompt = data.choices?.[0]?.message?.content?.trim();
+  if (!prompt) throw new Error('Empty response');
+  todPromptHistory.push(prompt);
+  if (todPromptHistory.length > 20) todPromptHistory.shift();
+  return prompt;
+}
+
+function showPrompt(type, aiPrompt) {
   const arr = type==='truth'?TRUTHS:type==='dare'?DARES:WILDS;
-  const prompt = arr[Math.floor(Math.random()*arr.length)];
+  const prompt = aiPrompt || arr[Math.floor(Math.random()*arr.length)];
   const area = document.getElementById('tod-prompt-area');
   const iconHtml = type==='truth'?'<i class="fas fa-comment"></i> Truth':type==='dare'?'<i class="fas fa-fire"></i> Dare':'<i class="fas fa-bolt"></i> Wild Card';
+  const aiTag = aiPrompt ? ' <span style="font-size:9px;background:rgba(129,140,248,.2);border:1px solid rgba(129,140,248,.3);border-radius:6px;padding:1px 6px;color:var(--ai-color);font-family:Nunito,sans-serif;font-weight:800;letter-spacing:.08em;vertical-align:middle;"><i class="fas fa-robot" style="font-size:7px;"></i> AI</span>' : '';
   area.innerHTML = `
     <div class="prompt-card ${type}-card card-play-anim">
-      <div class="prompt-type">${iconHtml}</div>
+      <div class="prompt-type">${iconHtml}${aiTag}</div>
       <div class="prompt-text">${prompt}</div>
       <div class="prompt-actions">
         <button class="prompt-action-btn btn-complete" id="tod-complete-btn">
@@ -2780,6 +2886,26 @@ document.addEventListener('DOMContentLoaded', () => {
   wire('#browser-back-btn', ()=>showScreen('screen-launcher'));
   wire('#browser-refresh-btn', refreshLobbyBrowser);
   wire('#browser-create-btn', ()=>{ createRoom(); });
+
+  // Browser AI quick launch
+  wire('#browser-play-ai-btn', () => {
+    const type = document.getElementById('ai-game-type-select').value;
+    gameType = type;
+    if (type === 'tod') {
+      startAiTod();
+    } else {
+      const count = parseInt(document.getElementById('browser-ai-count').value, 10) || 2;
+      document.getElementById('ai-count-select').value = String(count);
+      startAiGame();
+    }
+  });
+  document.getElementById('ai-game-type-select')?.addEventListener('change', () => {
+    const isTod = document.getElementById('ai-game-type-select').value === 'tod';
+    document.getElementById('ai-opponent-count-wrap').style.display = isTod ? 'none' : '';
+    document.getElementById('browser-play-ai-btn').innerHTML = isTod
+      ? '<i class="fas fa-bullseye"></i> Start Truth or Dare'
+      : '<i class="fas fa-robot"></i> Play vs AI';
+  });
   document.getElementById('browser-inp-name')?.addEventListener('input', () => {
     const v = document.getElementById('browser-inp-name').value.trim();
     document.getElementById('browser-confirm-name').disabled = v.length < 1;
