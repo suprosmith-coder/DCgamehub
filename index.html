@@ -108,6 +108,51 @@ body::before{
   top:-60px;right:-60px;filter:blur(60px);opacity:.35;pointer-events:none;
 }
 .uno-card .card-glow{background:var(--uno-red);}
+
+/* ═══════════════════════════════
+   SHARDS SYSTEM
+═══════════════════════════════ */
+.shard-hud {
+  position:fixed;top:70px;right:14px;z-index:90;
+  background:rgba(0,0,0,.6);border:1px solid rgba(249,192,35,.3);
+  backdrop-filter:blur(12px);border-radius:14px;padding:7px 13px;
+  display:flex;align-items:center;gap:7px;
+  font-family:'Fredoka One',cursive;font-size:14px;color:var(--uno-yellow);
+  box-shadow:0 4px 16px rgba(249,192,35,.15);
+  transition:transform .2s;cursor:pointer;user-select:none;
+}
+.shard-hud:hover{transform:scale(1.05);}
+.shard-hud-icon{font-size:16px;animation:shardFloat 3s ease-in-out infinite;}
+.shard-reward-pop{
+  position:fixed;z-index:500;font-family:'Fredoka One',cursive;font-size:22px;
+  color:var(--uno-yellow);text-shadow:0 0 20px rgba(249,192,35,.8);
+  pointer-events:none;animation:rewardFloat 1.6s ease forwards;
+}
+@keyframes rewardFloat{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(1.4)}}
+
+/* ═══════════════════════════════
+   AI DIFFICULTY SELECT
+═══════════════════════════════ */
+.ai-difficulty-row {
+  display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;
+}
+.diff-btn {
+  flex:1;padding:8px 10px;border-radius:10px;border:1px solid var(--border);
+  background:rgba(255,255,255,.05);color:#9ca3af;font-family:'Nunito',sans-serif;
+  font-size:11px;font-weight:800;cursor:pointer;transition:all .2s;text-align:center;
+}
+.diff-btn.active{background:rgba(129,140,248,.18);border-color:rgba(129,140,248,.45);color:#a5b4fc;}
+.diff-btn:hover{background:rgba(255,255,255,.1);}
+
+/* launcher card preview floaters */
+.card-floater{
+  position:fixed;pointer-events:none;z-index:0;border-radius:8px;opacity:.18;
+  animation:floatCard linear infinite;transform-origin:center;
+}
+@keyframes floatCard{
+  0%{transform:translateY(110vh) rotate(var(--rot-start)) scale(.7);}
+  100%{transform:translateY(-120px) rotate(var(--rot-end)) scale(.9);}
+}
 .tod-card .card-glow{background:var(--tod-purple);}
 .card-icon{font-size:50px;margin-bottom:12px;display:block;filter:drop-shadow(0 4px 12px rgba(0,0,0,.5));}
 .card-icon img{width:54px;height:54px;object-fit:contain;display:block;}
@@ -761,12 +806,20 @@ body::before{
 }
 .effect-overlay-command{background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(147,51,234,.4) 0%,transparent 70%);}
 .effect-overlay-command .effect-text{color:#c084fc;}
-}
 
 /* ═══════════════════════════════
    ANIMATIONS
 ═══════════════════════════════ */
 @keyframes fadeDown{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes livePulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.8);opacity:.5}}
+@keyframes rippleOut{0%{transform:scale(0);opacity:.6}100%{transform:scale(3);opacity:0}}
+@keyframes cardSnap{0%{transform:translateY(-6px) scale(1.04)}60%{transform:translateY(2px) scale(.98)}100%{transform:translateY(0) scale(1)}}
+@keyframes shardFloat{0%{transform:translateY(0) rotate(0deg);opacity:.7}50%{transform:translateY(-12px) rotate(180deg);opacity:1}100%{transform:translateY(0) rotate(360deg);opacity:.7}}
+.btn-ripple{position:relative;overflow:hidden;}
+.btn-ripple::after{content:'';position:absolute;border-radius:50%;background:rgba(255,255,255,.3);width:100px;height:100px;margin:-50px;transform:scale(0);pointer-events:none;}
+.btn-ripple:active::after{animation:rippleOut .4s ease forwards;}
+.card-snap{animation:cardSnap .25s ease both;}
+.shard-float{animation:shardFloat 3s ease-in-out infinite;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -872,27 +925,56 @@ body::before{
   .activity-grid{grid-template-columns:1fr;}
   .hand-cards .card-img-wrap img{border-radius:7px;}
   .chat-panel{width:220px;}
+  /* Performance: reduce blur on mobile */
+  .card-glow{filter:blur(30px)!important;}
+  .modal-overlay{backdrop-filter:blur(4px);}
+  .browser-topbar,.game-topbar{backdrop-filter:blur(8px);}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important;}
 }
 </style>
 </head>
 <body>
 
 <canvas id="bg-canvas"></canvas>
+<canvas id="card-preview-canvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity 1s;" id="card-preview-canvas"></canvas>
 
 <!-- Special card effect overlay -->
 <div class="effect-overlay" id="effect-overlay">
   <span class="effect-text" id="effect-text"></span>
 </div>
 
+<!-- Shards HUD (top-right, visible in game screens) -->
+<div class="shard-hud" id="shard-hud" title="Your Shards" onclick="showShardInfo()">
+  <span class="shard-hud-icon">💎</span>
+  <span id="shard-count">0</span>
+</div>
+
 <!-- LAUNCHER -->
 <div id="screen-launcher" class="screen active">
   <div class="launcher-header">
+    <!-- NixAi Brand Bar -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px;">
+      <div style="background:linear-gradient(135deg,#5865F2,#818cf8);width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive;font-size:14px;color:#fff;box-shadow:0 4px 12px rgba(88,101,242,.5);">N</div>
+      <span style="font-family:'Fredoka One',cursive;font-size:15px;background:linear-gradient(135deg,#a5b4fc,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">NixAi · Game Hub</span>
+    </div>
     <div class="discord-badge">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.053a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.075.075 0 0 0-.041-.104 13.175 13.175 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
       Discord Activity
     </div>
     <h1>Game Hub</h1>
     <p>Play with friends right inside your voice channel</p>
+    <!-- Live stats bar -->
+    <div id="live-stats-bar" style="display:flex;align-items:center;justify-content:center;gap:14px;margin-top:12px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:6px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:20px;padding:5px 13px;">
+        <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;animation:livePulse 1.5s ease infinite;"></span>
+        <span style="font-size:12px;font-weight:800;color:#4ade80;" id="stat-players">🔥 — players online</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;background:rgba(249,192,35,.1);border:1px solid rgba(249,192,35,.25);border-radius:20px;padding:5px 13px;">
+        <span style="font-size:12px;font-weight:800;color:#fbbf24;" id="stat-games">🎮 — active games</span>
+      </div>
+    </div>
   </div>
   <div class="activity-grid">
     <div class="activity-card uno-card">
@@ -906,7 +988,7 @@ body::before{
         <span class="meta-pill"><i class="fas fa-robot"></i> AI Mode</span>
         <span class="meta-pill"><i class="fas fa-eye"></i> Spectate</span>
       </div>
-      <button class="launch-btn"><i class="fas fa-rocket"></i> Launch Game</button>
+      <button class="launch-btn btn-ripple"><i class="fas fa-rocket"></i> Launch Game</button>
     </div>
     <div class="activity-card tod-card">
       <div class="card-glow"></div>
@@ -919,7 +1001,7 @@ body::before{
         <span class="meta-pill"><i class="fas fa-bolt"></i> Wild Cards</span>
         <span class="meta-pill"><i class="fas fa-fire"></i> Party Mode</span>
       </div>
-      <button class="launch-btn"><i class="fas fa-rocket"></i> Launch Game</button>
+      <button class="launch-btn btn-ripple"><i class="fas fa-rocket"></i> Launch Game</button>
     </div>
   </div>
 </div>
@@ -967,7 +1049,12 @@ body::before{
               </select>
             </div>
           </div>
-          <button class="btn btn-ai" id="browser-play-ai-btn" style="width:100%;margin-top:10px;">
+          <div class="ai-difficulty-row" id="ai-diff-row">
+            <button class="diff-btn active" data-diff="normal" onclick="selectDifficulty(this,'normal')">⚡ Normal</button>
+            <button class="diff-btn" data-diff="hard" onclick="selectDifficulty(this,'hard')">🧠 Smart</button>
+            <button class="diff-btn" data-diff="chaos" onclick="selectDifficulty(this,'chaos')">🃏 Chaos</button>
+          </div>
+          <button class="btn btn-ai btn-ripple" id="browser-play-ai-btn" style="width:100%;margin-top:10px;">
             <i class="fas fa-robot"></i> Play vs AI
           </button>
         </div>
@@ -1234,8 +1321,11 @@ body::before{
     <i class="fas fa-trophy win-icon" id="win-icon"></i>
     <h3 id="win-title">You Win!</h3>
     <p class="win-subtitle" id="win-subtitle">Great game!</p>
+    <div id="win-shards-earned" style="display:none;background:rgba(249,192,35,.1);border:1px solid rgba(249,192,35,.3);border-radius:12px;padding:10px 16px;margin:10px 0;font-family:'Fredoka One',cursive;font-size:18px;color:var(--uno-yellow);">
+      💎 <span id="win-shards-num">0</span> Shards Earned!
+    </div>
     <div class="btn-row" style="margin-top:16px;">
-      <button class="btn btn-primary" id="win-modal-btn">
+      <button class="btn btn-primary btn-ripple" id="win-modal-btn">
         <i class="fas fa-undo"></i> Back to Lobby
       </button>
     </div>
@@ -1286,6 +1376,15 @@ const TURN_SECONDS = CFG.TURN_SECONDS;
 const RING_CIRC = 50.26;
 const AI_ID_PREFIX = 'ai_player_';
 const AI_NAMES = ['Blaze','Nova','Chip','Orion','Pixel','Echo'];
+// AI Personalities: affects card selection bias and chat taunts
+const AI_PERSONALITIES = {
+  Blaze:  { style:'aggressive', taunts:["🔥 I'm literally unstoppable","Watch and learn, human 😤","Too easy lol"], unoTaunt:"UNO! Get rekt 💀" },
+  Nova:   { style:'smart',      taunts:["Hmm, interesting move...","Calculated. ♟️","I see what you're doing."], unoTaunt:"UNO. I've been planning this." },
+  Chip:   { style:'troll',      taunts:["Oops 🙃","Did you mean to do that?","Skill issue 😇"], unoTaunt:"UNO LMAOOO" },
+  Orion:  { style:'aggressive', taunts:["You can't beat me!","I've already won 😎","Incoming +4 🎯"], unoTaunt:"ORION WINS. UNO!" },
+  Pixel:  { style:'troll',      taunts:["Beep boop 🤖","404: your win not found","Random.exe has entered the chat"], unoTaunt:"UNO! Did not expect that, did you?" },
+  Echo:   { style:'smart',      taunts:["Interesting…","Pattern detected.","Adapting strategy…"], unoTaunt:"UNO. Efficient." },
+};
 const AI_COLORS = ['#818cf8','#f43f5e','#22c55e','#f59e0b','#06b6d4','#8b5cf6'];
 const CARD_COLORS = ['red','blue','green','yellow'];
 const COLOR_DOT = { red:'#e8302c', blue:'#1a73e8', green:'#2db552', yellow:'#f9c023', black:'#555' };
@@ -1311,8 +1410,35 @@ function playSound(type) {
     o.connect(g); g.connect(ctx.destination);
     const now = ctx.currentTime;
     const sounds = {
-      play:    () => { o.type='sine'; o.frequency.setValueAtTime(440,now); o.frequency.exponentialRampToValueAtTime(660,now+.1); g.gain.setValueAtTime(.25,now); g.gain.exponentialRampToValueAtTime(.001,now+.2); o.start(now); o.stop(now+.2); },
-      draw:    () => { o.type='triangle'; o.frequency.setValueAtTime(220,now); o.frequency.linearRampToValueAtTime(180,now+.15); g.gain.setValueAtTime(.2,now); g.gain.exponentialRampToValueAtTime(.001,now+.2); o.start(now); o.stop(now+.2); },
+      play:    () => {
+        // Card snap — dual tone thwack
+        o.type='square'; o.frequency.setValueAtTime(800,now); o.frequency.exponentialRampToValueAtTime(200,now+.06);
+        g.gain.setValueAtTime(.18,now); g.gain.exponentialRampToValueAtTime(.001,now+.1); o.start(now); o.stop(now+.1);
+        const o3=ctx.createOscillator(); const g3=ctx.createGain();
+        o3.connect(g3); g3.connect(ctx.destination);
+        o3.type='sine'; o3.frequency.setValueAtTime(440,now+.04);
+        g3.gain.setValueAtTime(0,now+.04); g3.gain.linearRampToValueAtTime(.12,now+.06);
+        g3.gain.exponentialRampToValueAtTime(.001,now+.18); o3.start(now+.04); o3.stop(now+.18);
+      },
+      draw:    () => {
+        // Satisfying draw sound — low whoosh
+        o.type='triangle'; o.frequency.setValueAtTime(300,now); o.frequency.exponentialRampToValueAtTime(150,now+.2);
+        g.gain.setValueAtTime(.22,now); g.gain.exponentialRampToValueAtTime(.001,now+.25); o.start(now); o.stop(now+.25);
+      },
+      tick:    () => {
+        o.type='sine'; o.frequency.setValueAtTime(880,now);
+        g.gain.setValueAtTime(.08,now); g.gain.exponentialRampToValueAtTime(.001,now+.05); o.start(now); o.stop(now+.05);
+      },
+      urgentTick: () => {
+        [880,1100].forEach((f,i) => {
+          const ot=ctx.createOscillator(); const gt=ctx.createGain();
+          ot.connect(gt); gt.connect(ctx.destination);
+          ot.type='sine'; ot.frequency.value=f;
+          gt.gain.setValueAtTime(0,now+i*.06); gt.gain.linearRampToValueAtTime(.1,now+i*.06+.02);
+          gt.gain.exponentialRampToValueAtTime(.001,now+i*.06+.07);
+          ot.start(now+i*.06); ot.stop(now+i*.06+.1);
+        });
+      },
       uno:     () => {
         const freqs = [660,880,1100];
         freqs.forEach((f,i) => {
@@ -1425,8 +1551,11 @@ function getNextIdx(steps) {
 }
 function advanceTurn(steps=1) {
   const n = G.turnOrder.length;
+  const prev = G.currentTurnIdx;
   G.currentTurnIdx = ((G.currentTurnIdx + steps * G.direction) % n + n) % n;
-  G.round = Math.floor(G.turnOrder.reduce((_,__,i)=>i,0)/G.turnOrder.length) + (G.currentTurnIdx === 0 ? G.round + 1 : G.round);
+  // Only increment round when we wrap back to idx 0 going forward
+  if (G.currentTurnIdx < prev && G.direction === 1) G.round++;
+  else if (G.currentTurnIdx > prev && G.direction === -1 && prev === 0) G.round++;
 }
 function currentTurnName() {
   const id = G.turnOrder[G.currentTurnIdx];
@@ -2263,8 +2392,8 @@ function _updateTimerUI(secs) {
   ringFg.style.strokeDashoffset=RING_CIRC*(1-frac);
   timerEl.classList.remove('warn','crit');
   barFill.classList.remove('warn','crit');
-  if (secs<=5){timerEl.classList.add('crit');barFill.classList.add('crit');}
-  else if (secs<=10){timerEl.classList.add('warn');barFill.classList.add('warn');}
+  if (secs<=5){timerEl.classList.add('crit');barFill.classList.add('crit'); playSound('urgentTick');}
+  else if (secs<=10){timerEl.classList.add('warn');barFill.classList.add('warn'); playSound('tick');}
   barFill.style.width=Math.max(0,frac*100)+'%';
 }
 function onTimerExpired() {
@@ -2297,18 +2426,39 @@ function executeAiTurn(aiId) {
   if (!G||G.over) return;
   const hand = G.hands[aiId] || [];
   const playable = hand.filter(c => isAiPlayable(c, G.topCard, G.topColor, G.drawStack));
+  const aiName = G.players[aiId]?.name || 'AI';
+  const personality = AI_PERSONALITIES[aiName] || AI_PERSONALITIES.Blaze;
 
   if (playable.length === 0) {
     processAction({ type:'draw_card', playerId:aiId });
-    if (hand.length === 1) setTimeout(() => { showToast(`${G.players[aiId]?.name} says UNO!`,'fa-robot'); addLog(`${G.players[aiId]?.name} shouted UNO!`,'log-ai'); renderLog(); }, 400);
+    if (hand.length === 1) {
+      setTimeout(() => {
+        showToast(`${aiName}: ${personality.unoTaunt}`,'fa-robot',3500);
+        addLog(`${aiName} shouted UNO!`,'log-ai');
+        renderLog();
+      }, 400);
+    }
     return;
   }
 
-  const actionValues = ['skip','reverse','draw2','wild4'];
+  // Personality-driven card selection
   let chosen = null;
-  for (const v of actionValues) { const f=playable.find(c=>c.value===v&&c.color===G.topColor); if(f){chosen=f;break;} }
-  if (!chosen) chosen = playable.find(c=>c.color===G.topColor);
-  if (!chosen) chosen = playable.find(c=>c.value===G.topCard.value);
+  const actionValues = ['skip','reverse','draw2','wild4'];
+
+  if (personality.style === 'aggressive') {
+    // Prioritize draw cards and skips aggressively
+    for (const v of ['wild4','draw2','skip','reverse']) {
+      const f=playable.find(c=>c.value===v); if(f){chosen=f;break;}
+    }
+  } else if (personality.style === 'troll') {
+    // Random chaos — pick randomly from playable
+    chosen = playable[Math.floor(Math.random()*playable.length)];
+  } else {
+    // Smart: maximize color matches, preserve wilds
+    for (const v of actionValues) { const f=playable.find(c=>c.value===v&&c.color===G.topColor); if(f){chosen=f;break;} }
+    if (!chosen) chosen = playable.find(c=>c.color===G.topColor);
+    if (!chosen) chosen = playable.find(c=>c.value===G.topCard.value);
+  }
   if (!chosen) chosen = playable.find(c=>c.color==='black');
   if (!chosen) chosen = playable[0];
 
@@ -2319,7 +2469,22 @@ function executeAiTurn(aiId) {
     chosenColor = Object.entries(cc).sort((a,b)=>b[1]-a[1])[0][0];
   }
 
-  if (hand.length === 2) setTimeout(() => { showToast(`${G.players[aiId]?.name} says UNO!`,'fa-robot'); addLog(`${G.players[aiId]?.name} shouted UNO!`,'log-ai'); renderLog(); }, 400);
+  // Occasional AI taunts in chat (15% chance)
+  if (Math.random() < 0.15 && personality.taunts) {
+    const taunt = personality.taunts[Math.floor(Math.random()*personality.taunts.length)];
+    setTimeout(() => addChatMessage({ playerId:aiId, name:aiName }, null, false,
+      `<span class="chat-msg-name" style="color:var(--ai-color);">${aiName}:</span><span class="chat-msg-text"> ${taunt}</span>`
+    ), 600);
+  }
+
+  if (hand.length === 2) {
+    setTimeout(() => {
+      showToast(`${aiName}: ${personality.unoTaunt}`,'fa-robot',3500);
+      playSound('uno');
+      addLog(`${aiName} shouted UNO!`,'log-ai');
+      renderLog();
+    }, 400);
+  }
   playSound('play');
   processAction({ type:'play_card', playerId:aiId, card:chosen, chosenColor });
 }
@@ -2540,12 +2705,14 @@ function receiveChatMessage(payload) {
   }
 }
 
-function addChatMessage(payload, systemText, isSystem) {
+function addChatMessage(payload, systemText, isSystem, rawHtml) {
   const container = document.getElementById('chat-messages');
   if (!container) return;
   const el = document.createElement('div');
   el.className = 'chat-msg';
-  if (isSystem) {
+  if (rawHtml) {
+    el.innerHTML = rawHtml;
+  } else if (isSystem) {
     el.innerHTML = `<span class="chat-msg-system">${systemText}</span>`;
   } else {
     const isMe = payload.playerId === MY_ID;
@@ -2624,6 +2791,7 @@ function renderDiscardPile() {
   pile.innerHTML = '';
   if (!G.topCard) return;
   const el = cardEl(G.topCard, { w:80, h:120, isDiscard:true, animate:true });
+  el.classList.add('card-snap');
   pile.appendChild(el);
   setDiscardEffect(G.topCard);
 }
@@ -2699,6 +2867,14 @@ function showWinModal(winnerId) {
   icon.style.color = isMe ? 'var(--uno-yellow)' : (isAiWinner?'var(--ai-color)':'#a78bfa');
   document.getElementById('win-title').textContent   = isMe?'You Win! 🎉':`${p?.name||'Player'} Wins!`;
   document.getElementById('win-subtitle').textContent = isMe?'Great play!':(isAiWinner?'The AI beat you this time!':'Better luck next round!');
+  // Show shards earned
+  const shardsEl = document.getElementById('win-shards-earned');
+  const shardsNum = document.getElementById('win-shards-num');
+  if (shardsEl && shardsNum) {
+    const earned = isMe ? (isAiMode ? (selectedDifficulty==='hard'?50:selectedDifficulty==='chaos'?35:20) : 30) : 5;
+    shardsEl.style.display = '';
+    shardsNum.textContent = earned;
+  }
   document.getElementById('win-modal').classList.add('show');
 }
 
@@ -2945,6 +3121,18 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id)?.classList.add('active');
   window.scrollTo(0,0);
+  // Show/hide shard HUD
+  const shardHud = document.getElementById('shard-hud');
+  if (shardHud) {
+    shardHud.style.display = (id === 'screen-launcher' || id === 'screen-lobby-browser') ? 'none' : '';
+  }
+  // Restart/stop floaters based on screen
+  if (id === 'screen-launcher') {
+    document.querySelectorAll('.card-floater').forEach(f=>f.remove()); // remove old
+    setTimeout(startCardFloaters, 500);
+  } else {
+    document.querySelectorAll('.card-floater').forEach(f=>f.remove());
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2979,6 +3167,33 @@ async function tryInitDiscordSdk() {
 // ═══════════════════════════════════════════════════════════════
 // EVENT WIRING
 // ═══════════════════════════════════════════════════════════════
+function showShardInfo() {
+  const s = getShards();
+  showToast(`💎 You have ${s} Shards! Earn more by winning games.`, 'fa-gem', 3500);
+}
+
+// Award shards on win
+const _origShowWinModal = showWinModal;
+function showWinModal(winnerId) {
+  _origShowWinModal(winnerId);
+  if (winnerId === MY_ID) {
+    const earned = isAiMode ? (selectedDifficulty === 'hard' ? 50 : selectedDifficulty === 'chaos' ? 35 : 20) : 30;
+    setTimeout(()=>addShards(earned, 'Victory!'), 800);
+  } else {
+    // Consolation
+    setTimeout(()=>addShards(5, 'Participation'), 800);
+  }
+}
+
+// Award shards on UNO shout timing
+const _origShoutUno = shoutUno;
+function shoutUno() {
+  _origShoutUno();
+  if (G && G.myHand && G.myHand.length === 1) {
+    addShards(2, 'UNO!');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const wire = (sel,fn) => document.querySelector(sel)?.addEventListener('click',fn);
 
@@ -3122,12 +3337,121 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// SHARDS ECONOMY
+// ═══════════════════════════════════════════════════════════════
+const SHARDS_KEY = 'nixai_shards_v1';
+function getShards() { try { return parseInt(localStorage.getItem(SHARDS_KEY)||'0',10); } catch(e){return 0;} }
+function addShards(n, label) {
+  try {
+    const cur = getShards();
+    localStorage.setItem(SHARDS_KEY, String(cur + n));
+    updateShardHUD();
+    // Show floating reward
+    const pop = document.createElement('div');
+    pop.className = 'shard-reward-pop';
+    pop.innerHTML = `+${n} 💎 ${label||'Shards'}`;
+    pop.style.left = (Math.random()*40+30)+'%';
+    pop.style.top = '50%';
+    document.body.appendChild(pop);
+    setTimeout(()=>pop.remove(),1800);
+  } catch(e){}
+}
+function updateShardHUD() {
+  const el = document.getElementById('shard-count');
+  if(el) el.textContent = getShards().toLocaleString();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AI DIFFICULTY
+// ═══════════════════════════════════════════════════════════════
+let selectedDifficulty = 'normal';
+function selectDifficulty(btn, diff) {
+  selectedDifficulty = diff;
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Remap AI personalities based on difficulty
+  if (diff === 'hard') {
+    AI_NAMES.forEach(n => { if(AI_PERSONALITIES[n]) AI_PERSONALITIES[n].style = 'smart'; });
+  } else if (diff === 'chaos') {
+    AI_NAMES.forEach(n => { if(AI_PERSONALITIES[n]) AI_PERSONALITIES[n].style = 'troll'; });
+  } else {
+    // normal — restore defaults
+    AI_PERSONALITIES.Blaze.style='aggressive'; AI_PERSONALITIES.Nova.style='smart';
+    AI_PERSONALITIES.Chip.style='troll'; AI_PERSONALITIES.Orion.style='aggressive';
+    AI_PERSONALITIES.Pixel.style='troll'; AI_PERSONALITIES.Echo.style='smart';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LIVE STATS SIMULATION
+// ═══════════════════════════════════════════════════════════════
+function updateLiveStats() {
+  // Simulate live numbers with gentle jitter around realistic values
+  const base = { players: 24, games: 6 };
+  const pJitter = Math.floor(Math.random()*8)-3;
+  const gJitter = Math.floor(Math.random()*4)-1;
+  const players = Math.max(8, base.players + pJitter);
+  const games   = Math.max(1, base.games + gJitter);
+  const pEl = document.getElementById('stat-players');
+  const gEl = document.getElementById('stat-games');
+  if (pEl) pEl.textContent = `🔥 ${players} players online`;
+  if (gEl) gEl.textContent = `🎮 ${games} active games`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ANIMATED CARD FLOATERS (launcher background)
+// ═══════════════════════════════════════════════════════════════
+const CARD_COLORS_FLOATERS = ['R','B','G','Y'];
+const CARD_VALS_FLOATERS = ['1','3','5','7','9','S','R','A2'];
+function spawnCardFloater() {
+  const col = CARD_COLORS_FLOATERS[Math.floor(Math.random()*4)];
+  const val = CARD_VALS_FLOATERS[Math.floor(Math.random()*CARD_VALS_FLOATERS.length)];
+  const el = document.createElement('div');
+  el.className = 'card-floater';
+  const rotStart = (Math.random()*60-30)+'deg';
+  const rotEnd = (Math.random()*60-30)+'deg';
+  const dur = (8+Math.random()*10)+'s';
+  const left = (Math.random()*95)+'%';
+  el.style.cssText = `left:${left};bottom:-120px;width:42px;height:63px;--rot-start:${rotStart};--rot-end:${rotEnd};animation-duration:${dur};animation-delay:${Math.random()*8}s;`;
+  // Card visual
+  const colorMap2={R:'#e8302c',B:'#1a73e8',G:'#2db552',Y:'#f9c023'};
+  el.style.background = `linear-gradient(145deg,${colorMap2[col]},${colorMap2[col]}bb)`;
+  el.style.border = '2px solid rgba(255,255,255,.2)';
+  el.style.borderRadius = '7px';
+  el.style.display = 'flex';el.style.alignItems='center';el.style.justifyContent='center';
+  el.style.fontFamily = 'Fredoka One,cursive';
+  el.style.fontSize = '16px';el.style.color='rgba(255,255,255,.8)';
+  el.textContent = val;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), parseFloat(dur)*1000+10000);
+}
+function startCardFloaters() {
+  // Only show on launcher
+  if (document.querySelector('.screen.active')?.id !== 'screen-launcher') return;
+  spawnCardFloater();
+  setTimeout(startCardFloaters, 1800+Math.random()*2000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHARD REWARDS ON GAME EVENTS
+// ═══════════════════════════════════════════════════════════════
+const _origCheckWin = checkWin;
+// Wrapped in startGame / showWinModal below for shard awarding
+
+// ═══════════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════════
 (async function boot() {
   tryInitDiscordSdk().catch(()=>{});
   const hasSupa = initSupabase();
   if (!hasSupa) console.warn('Running without Supabase.');
+  // Init live stats
+  updateLiveStats();
+  setInterval(updateLiveStats, 12000);
+  // Shard HUD
+  updateShardHUD();
+  // Start card floaters
+  setTimeout(startCardFloaters, 1500);
 })();
 </script>
 </body>
