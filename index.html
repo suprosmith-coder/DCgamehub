@@ -131,8 +131,212 @@ body::before{
 @keyframes rewardFloat{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(1.4)}}
 
 /* ═══════════════════════════════
-   AI DIFFICULTY SELECT
+   SHOP MODAL
 ═══════════════════════════════ */
+.shop-modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);
+  z-index:400;align-items:flex-start;justify-content:center;
+  backdrop-filter:blur(10px);overflow-y:auto;padding:24px 12px 60px;
+}
+.shop-modal-overlay.show{display:flex;}
+.shop-box{
+  background:var(--surface);border:1px solid rgba(249,192,35,.25);
+  border-radius:24px;padding:28px 22px;width:100%;max-width:440px;
+  box-shadow:0 24px 80px rgba(0,0,0,.8);animation:cardReveal .35s cubic-bezier(.34,1.56,.64,1) both;
+  position:relative;
+}
+.shop-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.shop-title{font-family:'Fredoka One',cursive;font-size:24px;color:var(--uno-yellow);display:flex;align-items:center;gap:9px;}
+.shop-close{background:rgba(255,255,255,.08);border:none;color:#9ca3af;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.shop-close:hover{background:rgba(255,255,255,.15);color:#fff;}
+.shop-balance{background:rgba(249,192,35,.1);border:1px solid rgba(249,192,35,.25);border-radius:12px;padding:10px 16px;font-family:'Fredoka One',cursive;font-size:18px;color:var(--uno-yellow);text-align:center;margin-bottom:18px;}
+.shop-section-title{font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;}
+.shop-item{
+  background:rgba(255,255,255,.04);border:1px solid var(--border);
+  border-radius:14px;padding:14px 12px;cursor:pointer;transition:all .2s;
+  display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;
+  position:relative;overflow:hidden;
+}
+.shop-item:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);transform:translateY(-2px);}
+.shop-item.owned{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.06);}
+.shop-item.equipped{border-color:rgba(88,101,242,.5);background:rgba(88,101,242,.1);box-shadow:0 0 16px rgba(88,101,242,.2);}
+.shop-item-icon{font-size:30px;}
+.shop-item-name{font-size:12px;font-weight:800;color:#fff;}
+.shop-item-desc{font-size:10px;color:var(--muted);font-weight:700;line-height:1.3;}
+.shop-item-price{font-family:'Fredoka One',cursive;font-size:13px;color:var(--uno-yellow);display:flex;align-items:center;gap:4px;margin-top:2px;}
+.shop-item-badge{position:absolute;top:6px;right:6px;font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:6px;}
+.badge-owned{background:rgba(34,197,94,.2);color:#4ade80;}
+.badge-equipped{background:rgba(88,101,242,.25);color:#a5b4fc;}
+.shop-preview{width:100%;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;margin-top:4px;}
+.shop-preview-label{font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.card-color-preview{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+.card-color-swatch{width:38px;height:56px;border-radius:7px;border:2px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive;font-size:13px;color:rgba(255,255,255,.9);transition:transform .2s;}
+
+/* ═══════════════════════════════
+   COMBO DISPLAY
+═══════════════════════════════ */
+.combo-overlay{
+  position:fixed;inset:0;z-index:160;pointer-events:none;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .2s;
+}
+.combo-overlay.show{opacity:1;}
+.combo-banner{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  animation:comboPop .5s cubic-bezier(.34,1.56,.64,1) both;
+}
+.combo-label{
+  font-family:'Fredoka One',cursive;font-size:clamp(36px,9vw,80px);
+  background:linear-gradient(135deg,#f9c023,#f43f5e,#818cf8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  text-shadow:none;letter-spacing:.02em;filter:drop-shadow(0 0 30px rgba(249,192,35,.6));
+}
+.combo-sub{font-family:'Fredoka One',cursive;font-size:clamp(14px,3vw,22px);color:#fff;opacity:.85;letter-spacing:.08em;}
+@keyframes comboPop{
+  0%{transform:scale(0.3) rotate(-8deg);opacity:0;}
+  60%{transform:scale(1.15) rotate(2deg);opacity:1;}
+  100%{transform:scale(1) rotate(0);opacity:1;}
+}
+
+/* ═══════════════════════════════
+   COMING SOON (ToD)
+═══════════════════════════════ */
+.coming-soon-card{
+  background:linear-gradient(135deg,#1a0a2e,#2d1b6e,#1a0a2e);
+  border:2px dashed rgba(124,58,237,.4);border-radius:20px;
+  padding:40px 26px;text-align:center;position:relative;overflow:hidden;
+  cursor:default;
+}
+.coming-soon-glow{
+  position:absolute;width:300px;height:300px;border-radius:50%;
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  background:radial-gradient(circle,rgba(124,58,237,.18) 0%,transparent 70%);
+  pointer-events:none;
+}
+.coming-soon-icon{font-size:52px;margin-bottom:12px;display:block;opacity:.7;}
+.coming-soon-title{font-family:'Fredoka One',cursive;font-size:26px;color:#a78bfa;margin-bottom:8px;}
+.coming-soon-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.4);
+  border-radius:20px;padding:6px 16px;font-size:12px;font-weight:800;
+  letter-spacing:.1em;text-transform:uppercase;color:#a78bfa;margin-bottom:12px;
+}
+.coming-soon-desc{font-size:13px;color:#6b7280;font-weight:700;line-height:1.5;}
+
+/* Music toggle button */
+.music-btn{
+  position:fixed;bottom:18px;left:14px;z-index:90;
+  background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);
+  backdrop-filter:blur(12px);border-radius:12px;padding:7px 13px;
+  display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;
+  color:#9ca3af;cursor:pointer;transition:all .2s;user-select:none;
+}
+.music-btn:hover{background:rgba(255,255,255,.1);color:#fff;}
+.music-btn.playing{border-color:rgba(88,101,242,.4);color:var(--accent2);}
+.music-btn i{font-size:13px;}
+
+/* ═══════════════════════════════
+   DEAL ANIMATION SCREEN
+═══════════════════════════════ */
+#screen-dealing{
+  justify-content:center;align-items:center;
+  background:var(--bg);z-index:300;
+}
+.deal-scene{
+  display:flex;flex-direction:column;align-items:center;gap:28px;
+  width:100%;max-width:420px;padding:40px 20px;
+}
+.deal-title{
+  font-family:'Fredoka One',cursive;font-size:28px;color:#fff;
+  text-align:center;animation:fadeDown .4s ease both;
+}
+.deal-deck-area{
+  position:relative;width:80px;height:120px;
+  display:flex;align-items:center;justify-content:center;
+}
+.deal-deck-card{
+  position:absolute;width:70px;height:105px;
+  background:linear-gradient(145deg,#c0221e,#e8302c);
+  border-radius:9px;border:2px solid rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fredoka One',cursive;font-size:18px;color:rgba(255,255,255,.9);
+  box-shadow:0 4px 16px rgba(0,0,0,.5);
+  transition:transform .15s ease,opacity .15s ease;
+}
+.deal-players-row{
+  display:flex;gap:14px;flex-wrap:wrap;justify-content:center;
+  width:100%;
+}
+.deal-player-slot{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  min-width:68px;
+}
+.deal-player-avatar{
+  width:40px;height:40px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:900;color:#fff;
+  border:2px solid rgba(255,255,255,.15);
+  transition:transform .2s,box-shadow .2s;
+}
+.deal-player-avatar.receiving{
+  transform:scale(1.15);
+  box-shadow:0 0 20px rgba(249,192,35,.6);
+}
+.deal-player-name{font-size:11px;font-weight:800;color:#9ca3af;text-align:center;}
+.deal-card-count{
+  font-family:'Fredoka One',cursive;font-size:13px;color:var(--uno-yellow);
+  min-height:18px;
+}
+.deal-status{
+  font-size:13px;color:var(--muted);font-weight:700;text-align:center;
+  min-height:22px;
+}
+.deal-flying-card{
+  position:fixed;z-index:350;pointer-events:none;
+  width:50px;height:75px;
+  background:linear-gradient(145deg,#c0221e,#e8302c);
+  border-radius:7px;border:2px solid rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fredoka One',cursive;font-size:14px;color:rgba(255,255,255,.9);
+  box-shadow:0 6px 20px rgba(0,0,0,.5);
+  transition:transform .32s cubic-bezier(.4,0,.2,1),top .32s cubic-bezier(.4,0,.2,1),left .32s cubic-bezier(.4,0,.2,1),opacity .2s ease;
+}
+@keyframes shuffle1{0%{transform:translateX(0) rotate(0)}25%{transform:translateX(-18px) rotate(-5deg)}75%{transform:translateX(18px) rotate(5deg)}100%{transform:translateX(0) rotate(0)}}
+@keyframes shuffle2{0%{transform:translateY(0)}50%{transform:translateY(-10px) scale(1.04)}100%{transform:translateY(0)}}
+.shuffling .deal-deck-card:nth-child(odd){animation:shuffle1 .22s ease both;}
+.shuffling .deal-deck-card:nth-child(even){animation:shuffle2 .22s .06s ease both;}
+
+/* ═══════════════════════════════
+   DRAG & DROP
+═══════════════════════════════ */
+.card-img-wrap.dragging{
+  opacity:0.35;
+  transform:scale(0.9)!important;
+}
+.card-img-wrap[draggable="true"]{cursor:grab;}
+.card-img-wrap[draggable="true"]:active{cursor:grabbing;}
+.drop-zone{
+  position:absolute;inset:-18px;border-radius:22px;
+  border:3px dashed transparent;
+  transition:all .2s;z-index:15;pointer-events:all;
+}
+.drop-zone.drag-over{
+  border-color:rgba(249,192,35,.8);
+  background:rgba(249,192,35,.12);
+  box-shadow:0 0 30px rgba(249,192,35,.4);
+}
+.drag-ghost{
+  position:fixed;z-index:9999;pointer-events:none;
+  width:54px;height:81px;
+  border-radius:8px;opacity:.92;
+  background:linear-gradient(145deg,rgba(30,32,64,.95),rgba(22,24,41,.95));
+  border:2px solid rgba(255,255,255,.3);
+  box-shadow:0 12px 40px rgba(0,0,0,.7);
+  display:flex;align-items:center;justify-content:center;
+  transform:rotate(-8deg) scale(1.08);
+  transition:none;
+}
 .ai-difficulty-row {
   display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;
 }
@@ -990,18 +1194,17 @@ body::before{
       </div>
       <button class="launch-btn btn-ripple"><i class="fas fa-rocket"></i> Launch Game</button>
     </div>
-    <div class="activity-card tod-card">
+    <div class="activity-card tod-card" style="cursor:default;">
       <div class="card-glow"></div>
-      <span class="card-icon"><i class="fas fa-bullseye fa-icon-large" style="color:#ec4899;"></i></span>
-      <div class="card-label">Party Game</div>
-      <div class="card-title">Truth or Dare</div>
-      <div class="card-desc">AI-powered truths, dares, and wild cards. Spin the wheel, face the consequences.</div>
+      <div class="coming-soon-glow"></div>
+      <span class="card-icon"><i class="fas fa-bullseye fa-icon-large" style="color:#ec4899;opacity:.55;"></i></span>
+      <div class="card-label" style="color:#a78bfa;">Party Game</div>
+      <div class="card-title" style="opacity:.65;">Truth or Dare</div>
+      <div class="card-desc" style="opacity:.55;">Epic party mode with AI-powered truths, dares, and wild cards is under construction. Stay tuned!</div>
       <div class="card-meta">
-        <span class="meta-pill"><i class="fas fa-users"></i> 2–12 Players</span>
-        <span class="meta-pill"><i class="fas fa-bolt"></i> Wild Cards</span>
-        <span class="meta-pill"><i class="fas fa-fire"></i> Party Mode</span>
+        <span class="coming-soon-badge"><i class="fas fa-hammer"></i> Coming Soon</span>
       </div>
-      <button class="launch-btn btn-ripple"><i class="fas fa-rocket"></i> Launch Game</button>
+      <button class="launch-btn" style="background:rgba(124,58,237,.25);color:#a78bfa;box-shadow:none;cursor:not-allowed;opacity:.7;" disabled><i class="fas fa-lock"></i> Coming Soon</button>
     </div>
   </div>
 </div>
@@ -1160,6 +1363,18 @@ body::before{
   </div>
 </div>
 
+<!-- DEAL ANIMATION SCREEN -->
+<div id="screen-dealing" class="screen">
+  <div class="deal-scene">
+    <div class="deal-title" id="deal-title">🃏 Shuffling Deck…</div>
+    <div class="deal-deck-area" id="deal-deck-area">
+      <!-- Cards stack built by JS -->
+    </div>
+    <div class="deal-players-row" id="deal-players-row"></div>
+    <div class="deal-status" id="deal-status">Preparing the cards…</div>
+  </div>
+</div>
+
 <!-- UNO GAME -->
 <div id="screen-uno" class="screen">
   <div class="game-topbar">
@@ -1196,7 +1411,9 @@ body::before{
           <path d="M 110 20 A 90 90 0 1 1 20 110" fill="none" stroke="rgba(249,192,35,.28)" stroke-width="2" stroke-dasharray="8 4" marker-end="url(#arrowhead)" id="turn-arrow-path"/>
         </svg>
       </div>
-      <div class="discard-pile" id="discard-pile"></div>
+      <div class="discard-pile" id="discard-pile">
+        <div class="drop-zone" id="discard-drop-zone" title="Drop card here to play"></div>
+      </div>
       <div class="draw-pile-btn" id="draw-pile-btn" title="Draw a card">
         <div class="draw-pile-inner">
           <div class="card-back-css" id="draw-pile-card" style="width:62px;height:93px;position:relative;">
@@ -1301,16 +1518,66 @@ body::before{
 
 <!-- Command Card Modal -->
 <div class="modal-overlay" id="command-modal">
-  <div class="modal-box" style="max-width:380px;">
+  <div class="modal-box" style="max-width:400px;">
     <div style="font-size:36px;margin-bottom:8px;">🃏</div>
     <h3 style="color:#c084fc;">Command Card!</h3>
-    <p style="color:var(--muted);font-size:12px;font-weight:700;margin-bottom:14px;">You may command anything in the game. All players must obey!</p>
-    <textarea id="command-card-inp" placeholder="e.g. Everyone draw 2 cards, Skip the next 2 players, Swap hands with the player to your left…" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(192,132,252,.3);border-radius:10px;padding:11px 14px;color:#fff;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;outline:none;resize:vertical;min-height:80px;box-sizing:border-box;"></textarea>
+    <p style="color:var(--muted);font-size:12px;font-weight:700;margin-bottom:10px;">You may issue any command. Type it or tap a suggestion below!</p>
+    <!-- Quick suggestions -->
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;" id="cmd-suggestions">
+      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Everyone draw 2 cards')">Everyone draw 2</button>
+      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Everyone draw 4 cards')">Everyone draw 4</button>
+      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Skip the next 2 players')">Skip next 2</button>
+      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Reverse the turn order')">Reverse</button>
+      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Next player draws 3 cards')">Next +3</button>
+      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Everyone skip their next turn')">Everyone skip</button>
+    </div>
+    <textarea id="command-card-inp" placeholder="Or type your own command…" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(192,132,252,.3);border-radius:10px;padding:11px 14px;color:#fff;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;outline:none;resize:vertical;min-height:70px;box-sizing:border-box;"></textarea>
     <div style="margin-top:14px;display:flex;gap:8px;">
       <button class="btn btn-secondary" id="command-card-cancel" style="flex:1;">Cancel</button>
       <button class="btn" id="command-card-confirm" style="flex:2;background:linear-gradient(135deg,#9333ea,#7c3aed);color:#fff;box-shadow:0 4px 14px rgba(147,51,234,.4);">
         <i class="fas fa-bolt"></i> Issue Command!
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Combo Banner Overlay -->
+<div class="combo-overlay" id="combo-overlay">
+  <div class="combo-banner">
+    <div class="combo-label" id="combo-label">COMBO!</div>
+    <div class="combo-sub" id="combo-sub">3 Cards!</div>
+  </div>
+</div>
+
+<!-- Music Toggle Button -->
+<button class="music-btn" id="music-btn" onclick="toggleMusic()" title="Toggle background music">
+  <i class="fas fa-music" id="music-icon"></i>
+  <span id="music-label">Music</span>
+</button>
+
+<!-- Shard Shop Modal -->
+<div class="shop-modal-overlay" id="shop-modal">
+  <div class="shop-box">
+    <div class="shop-header">
+      <div class="shop-title">💎 Shard Shop</div>
+      <button class="shop-close" onclick="closeShop()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="shop-balance">💎 <span id="shop-shard-count">0</span> Shards Available</div>
+
+    <div class="shop-section-title"><i class="fas fa-palette"></i> Card Back Colors</div>
+    <div class="shop-grid" id="shop-card-backs"></div>
+
+    <div class="shop-section-title"><i class="fas fa-star"></i> Perks</div>
+    <div class="shop-grid" id="shop-perks"></div>
+
+    <div class="shop-preview">
+      <div class="shop-preview-label"><i class="fas fa-eye"></i> Preview</div>
+      <div class="card-color-preview" id="shop-preview-area">
+        <div class="card-color-swatch" style="background:#e8302c;">1</div>
+        <div class="card-color-swatch" style="background:#1a73e8;">2</div>
+        <div class="card-color-swatch" style="background:#2db552;">3</div>
+        <div class="card-color-swatch" style="background:#f9c023;">4</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1624,7 +1891,7 @@ function cardEl(card, { w=56, h=84, idx=-1, inHand=false, isDiscard=false, anima
   const wrap = document.createElement('div');
   const isSelected = inHand && selectedIndices.includes(idx);
   const isFirstSelected = inHand && selectedIndices[0] === idx;
-  const playable = inHand && isPlayable(card);
+  const playable = inHand && (card.value === 'command' || isPlayable(card));
   const canStack = inHand && selectedIndices.length > 0 && canStackWith(card, selectedIndices.map(i=>G.myHand[i]));
 
   wrap.className = 'card-img-wrap' +
@@ -1636,7 +1903,7 @@ function cardEl(card, { w=56, h=84, idx=-1, inHand=false, isDiscard=false, anima
   const img = document.createElement('img');
   img.src   = CFG.CARD_PATH + cardFilename(card);
   img.alt   = cardLabel(card);
-  img.style.cssText = `width:${w}px;height:${h}px;`;
+  img.style.cssText = `width:${w}px;height:${h}px;pointer-events:none;user-select:none;-webkit-user-drag:none;display:block;`;
   if (isDiscard) img.classList.add(animate ? 'card-fly-in' : 'card-play-anim');
   img.onerror = function() {
     this.style.display='none';
@@ -1992,13 +2259,16 @@ function startAiGame() {
   houseRules.multistack = document.getElementById('rule-multistack').checked;
   const playerIds = Object.keys(lobbyPlayers);
   initGameState(playerIds);
-  showScreen('screen-uno');
   document.getElementById('ai-mode-badge').style.display = '';
   document.getElementById('spectator-badge').style.display = 'none';
   document.getElementById('spectator-indicator').style.display = 'none';
   initChatPanel();
-  renderGame();
-  _afterTurnSetup();
+  // Run deal animation then show game
+  runDealAnimation(() => {
+    renderGame();
+    _afterTurnSetup();
+    startMusic();
+  });
 }
 
 function startAiTod() {
@@ -2067,13 +2337,149 @@ async function startGame() {
   const playerIds = Object.keys(lobbyPlayers).filter(id => !lobbyPlayers[id]?.isSpectator);
   if (playerIds.length < 2 && SB) { showToast('Need at least 2 players to start','fa-exclamation-triangle'); return; }
   initGameState(playerIds);
-  showScreen('screen-uno');
   document.getElementById('ai-mode-badge').style.display = 'none';
   initChatPanel();
-  renderGame();
-  broadcast('game_state', { ...getSerializableState(), screenSwitch:'uno', houseRules });
-  _afterTurnSetup();
-  announceLobby();
+  broadcast('game_state', { ...getSerializableState(), screenSwitch:'dealing', houseRules });
+  runDealAnimation(() => {
+    renderGame();
+    broadcast('game_state', { ...getSerializableState(), screenSwitch:'uno', houseRules });
+    _afterTurnSetup();
+    announceLobby();
+    startMusic();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DEAL ANIMATION
+// ═══════════════════════════════════════════════════════════════
+function runDealAnimation(onComplete) {
+  showScreen('screen-dealing');
+  const titleEl  = document.getElementById('deal-title');
+  const deckArea = document.getElementById('deal-deck-area');
+  const playersRow = document.getElementById('deal-players-row');
+  const statusEl  = document.getElementById('deal-status');
+
+  // Build player slots
+  const BG = ['#5865F2','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f43f5e','#14b8a6'];
+  const AI_BG = ['#818cf8','#f43f5e','#22c55e','#f59e0b','#06b6d4','#8b5cf6'];
+  playersRow.innerHTML = '';
+  const slotMap = {};
+  G.turnOrder.forEach((id, i) => {
+    const p = G.players[id];
+    const isMe = id === MY_ID;
+    const isAiP = isAiId(id);
+    const bg = isAiP ? AI_BG[i % AI_BG.length] : BG[i % BG.length];
+    const slot = document.createElement('div');
+    slot.className = 'deal-player-slot';
+    slot.id = `deal-slot-${id}`;
+    slot.innerHTML = `
+      <div class="deal-player-avatar" id="deal-avatar-${id}" style="background:${bg}">
+        ${isAiP ? '<i class="fas fa-robot" style="font-size:13px;"></i>' : (p.name||'?').slice(0,1).toUpperCase()}
+      </div>
+      <div class="deal-player-name">${isMe ? 'You' : p.name}</div>
+      <div class="deal-card-count" id="deal-count-${id}">0</div>
+    `;
+    playersRow.appendChild(slot);
+    slotMap[id] = slot;
+  });
+
+  // Build deck stack visual (8 stacked cards)
+  deckArea.innerHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const c = document.createElement('div');
+    c.className = 'deal-deck-card';
+    c.style.transform = `rotate(${(i - 4) * 1.5}deg) translateY(${i * -1}px)`;
+    c.textContent = 'UNO';
+    deckArea.appendChild(c);
+  }
+
+  // Phase 1: Shuffle animation
+  titleEl.textContent = '🔀 Shuffling Deck…';
+  statusEl.textContent = 'Riffle… riffle… riffle…';
+  let shuffleCount = 0;
+  const SHUFFLE_ROUNDS = 5;
+
+  function doShuffle() {
+    if (shuffleCount >= SHUFFLE_ROUNDS) {
+      // Phase 2: Deal cards
+      titleEl.textContent = '🃏 Dealing Cards…';
+      setTimeout(dealNextCard, 300);
+      return;
+    }
+    deckArea.classList.add('shuffling');
+    playSound('draw');
+    setTimeout(() => {
+      deckArea.classList.remove('shuffling');
+      shuffleCount++;
+      setTimeout(doShuffle, 180);
+    }, 260);
+  }
+  doShuffle();
+
+  // Phase 2: Deal one card at a time to each player, 7 rounds
+  const CARDS_PER_PLAYER = 7;
+  const playerIds = G.turnOrder;
+  let dealRound = 0;
+  let dealPlayerIdx = 0;
+  const dealCounts = {};
+  playerIds.forEach(id => { dealCounts[id] = 0; });
+
+  function dealNextCard() {
+    if (dealRound >= CARDS_PER_PLAYER) {
+      // Done dealing
+      statusEl.textContent = '✅ All cards dealt!';
+      titleEl.textContent = `🎮 ${G.players[G.turnOrder[G.currentTurnIdx]]?.name || 'Player'} goes first!`;
+      setTimeout(() => {
+        showScreen('screen-uno');
+        onComplete();
+      }, 900);
+      return;
+    }
+
+    const targetId = playerIds[dealPlayerIdx];
+    const avatarEl = document.getElementById(`deal-avatar-${targetId}`);
+    const countEl  = document.getElementById(`deal-count-${targetId}`);
+    const deckRect = deckArea.getBoundingClientRect();
+    const slotEl   = document.getElementById(`deal-slot-${targetId}`);
+    const slotRect = slotEl ? slotEl.getBoundingClientRect() : deckRect;
+
+    // Animate a flying card from deck to player slot
+    const flyCard = document.createElement('div');
+    flyCard.className = 'deal-flying-card';
+    flyCard.textContent = 'UNO';
+    flyCard.style.top  = deckRect.top  + 'px';
+    flyCard.style.left = deckRect.left + 'px';
+    document.body.appendChild(flyCard);
+
+    // Flash avatar
+    if (avatarEl) { avatarEl.classList.add('receiving'); setTimeout(() => avatarEl.classList.remove('receiving'), 320); }
+
+    playSound('play');
+    statusEl.textContent = `Dealing to ${G.players[targetId]?.name || 'Player'}…`;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        flyCard.style.top  = (slotRect.top  + 4) + 'px';
+        flyCard.style.left = (slotRect.left + 4) + 'px';
+        flyCard.style.opacity = '0';
+      });
+    });
+
+    setTimeout(() => {
+      flyCard.remove();
+      dealCounts[targetId]++;
+      if (countEl) countEl.textContent = dealCounts[targetId];
+    }, 340);
+
+    // Advance to next player/round
+    dealPlayerIdx++;
+    if (dealPlayerIdx >= playerIds.length) {
+      dealPlayerIdx = 0;
+      dealRound++;
+    }
+
+    setTimeout(dealNextCard, 160);
+  }
 }
 
 function leaveLobby() {
@@ -2088,6 +2494,7 @@ function leaveLobby() {
   todAiMode = false;
   G = null;
   selectedIndices = [];
+  stopMusic();
   document.getElementById('ai-mode-badge').style.display = 'none';
   document.getElementById('spectator-badge').style.display = 'none';
   const todBadge = document.getElementById('tod-ai-badge');
@@ -2192,1267 +2599,61 @@ function processAction({ type, playerId, cards, card, chosenColor, swapTargetId 
     addLog(`${G.players[playerId]?.name} shouted UNO!`, 'log-warn');
 
   } else if (type === 'command_card') {
-    // Remove the command card from hand
+    // Remove the command card from hand (find by value='command')
     if (G.hands[playerId]) {
       const idx = G.hands[playerId].findIndex(h => h.value === 'command');
       if (idx !== -1) G.hands[playerId].splice(idx, 1);
     }
     G.players[playerId].cardCount = G.hands[playerId]?.length ?? 0;
     const pName = G.players[playerId]?.name || 'Player';
+    const cmdText = (card.commandText || '').toLowerCase().trim();
     addLog(`🃏 ${pName} commanded: "${card.commandText}"`, 'log-special');
-    if (checkWin(playerId)) { broadcastFullState(); return; }
-    broadcast('command_announce', { playerName: pName, commandText: card.commandText });
-    advanceTurn(1);
+    showCardEffect('command', 'COMMAND!');
 
-  } else if (type === 'timer_draw') {
-    if (!G.deck.length) reshuffleDeck();
-    const drawn = G.deck.splice(0,1);
-    G.hands[playerId] = [...(G.hands[playerId]||[]), ...drawn];
-    G.players[playerId].cardCount = G.hands[playerId].length;
-    addLog(`⏱ ${G.players[playerId]?.name} ran out of time!`, 'log-timer');
-    advanceTurn(1);
-  }
+    // Parse and auto-execute common command patterns
+    const everyoneDraw = cmdText.match(/everyone.*(draw|take|pick up)\s*(\d+)/i);
+    const skipNext = cmdText.match(/skip\s+(?:the\s+)?next\s*(\d+)?/i);
+    const nextDraw = cmdText.match(/next\s+player.*(?:draw|take|pick up)\s*(\d+)/i);
+    const reverseTurn = cmdText.match(/reverse/i);
+    const allSkip = cmdText.match(/everyone\s+skip|skip\s+everyone/i);
 
-  if (G.hands && G.hands[MY_ID]) G.myHand = G.hands[MY_ID];
-  if (!isAiMode) broadcastFullState();
-  renderGame();
-  if (G.started && !G.over) _afterTurnSetup();
-}
-
-function _afterTurnSetup() {
-  if(!G||!G.started||G.over) return;
-  const curId = G.turnOrder[G.currentTurnIdx];
-  if (isAiId(curId)) { stopTurnTimer(); maybeScheduleAiTurn(); }
-  else if (curId === MY_ID && !isSpectator) startTurnTimer();
-  else stopTurnTimer();
-}
-
-function applyCardEffect(card, playerId, chosenColor, swapTargetId, allCards) {
-  const nextIdx = getNextIdx(1);
-  const nextId  = G.turnOrder[nextIdx];
-
-  // Handle multi-stack: stack draw penalties
-  if (allCards && allCards.length > 1) {
-    // Count draw effects
-    let stackDraw = 0;
-    let hasSkip = false, hasReverse = false;
-    for (const c of allCards) {
-      if (c.value === 'draw2') stackDraw += 2;
-      if (c.value === 'wild4') stackDraw += 4;
-      if (c.value === 'skip') hasSkip = true;
-      if (c.value === 'reverse') hasReverse = true;
-    }
-    if (stackDraw > 0) {
-      G.drawStack += stackDraw;
-      addLog(`${G.players[nextId]?.name} must draw ${G.drawStack}!`, 'log-warn');
-      showCardEffect('draw', `+${G.drawStack}`);
-      playSound('skip');
-      advanceTurn(1);
+    if (everyoneDraw) {
+      const n = parseInt(everyoneDraw[2], 10) || 2;
+      G.turnOrder.forEach(id => {
+        if (id === playerId) return;
+        if (!G.deck.length) reshuffleDeck();
+        const drawn = G.deck.splice(0, n);
+        G.hands[id] = [...(G.hands[id]||[]), ...drawn];
+        G.players[id].cardCount = G.hands[id].length;
+      });
+      addLog(`Everyone (except ${pName}) drew ${n} cards!`, 'log-warn');
+      showCardEffect('draw', `+${n} ALL`);
+    } else if (allSkip) {
+      addLog(`Everyone is skipped! ${pName} goes again.`, 'log-special');
+      showCardEffect('skip', 'ALL SKIP!');
+      // Don't advance turn — player goes again
+      if (checkWin(playerId)) { broadcastFullState(); return; }
+      if (!isAiMode) broadcastFullState();
+      if (G.hands && G.hands[MY_ID]) G.myHand = G.hands[MY_ID];
+      renderGame();
+      broadcast('command_announce', { playerName: pName, commandText: card.commandText });
+      if (G.started && !G.over) _afterTurnSetup();
       return;
-    }
-  }
-
-  if (card.value === 'skip') {
-    addLog(`${G.players[nextId]?.name} was skipped!`, 'log-special');
-    showCardEffect('skip', 'SKIP!');
-    playSound('skip');
-    advanceTurn(2);
-
-  } else if (card.value === 'reverse') {
-    G.direction *= -1;
-    addLog('Direction reversed!', 'log-system');
-    showCardEffect('reverse', 'REVERSE!');
-    playSound('reverse');
-    advanceTurn(G.turnOrder.length === 2 ? 2 : 1);
-
-  } else if (card.value === 'draw2') {
-    G.drawStack += 2;
-    addLog(`${G.players[nextId]?.name} must draw 2 (or stack)!`, 'log-warn');
-    showCardEffect('draw', '+2');
-    playSound('skip');
-    advanceTurn(1);
-
-  } else if (card.value === 'wild4') {
-    G.drawStack += 4;
-    addLog(`${G.players[nextId]?.name} must draw 4!`, 'log-warn');
-    showCardEffect('wild', '+4 WILD');
-    playSound('wild');
-    advanceTurn(1);
-
-  } else if (card.value === 'wild') {
-    addLog(`Wild! Color changed to ${G.topColor}.`, 'log-system');
-    showCardEffect('wild', 'WILD!');
-    playSound('wild');
-    advanceTurn(1);
-
-  } else if (card.value === '7' && houseRules.seven && chosenColor === null) {
-    // Swap hands handled via modal
-    if (swapTargetId && G.hands[swapTargetId]) {
-      const myHand = G.hands[playerId];
-      G.hands[playerId] = G.hands[swapTargetId];
-      G.hands[swapTargetId] = myHand;
-      G.players[playerId].cardCount = G.hands[playerId].length;
-      G.players[swapTargetId].cardCount = G.hands[swapTargetId].length;
-      addLog(`${G.players[playerId]?.name} swapped hands with ${G.players[swapTargetId]?.name}!`, 'log-special');
-      showCardEffect('skip', 'SWAP!');
-    }
-    advanceTurn(1);
-
-  } else if (card.value === '0' && houseRules.zero) {
-    // Rotate all hands
-    const order = G.turnOrder;
-    const firstHand = G.hands[order[0]];
-    for (let i=0;i<order.length-1;i++) {
-      G.hands[order[i]] = G.hands[order[i+1]];
-      G.players[order[i]].cardCount = G.hands[order[i]].length;
-    }
-    G.hands[order[order.length-1]] = firstHand;
-    G.players[order[order.length-1]].cardCount = firstHand.length;
-    addLog('Hands rotated!', 'log-special');
-    showCardEffect('reverse', 'ROTATE!');
-    advanceTurn(1);
-
-  } else if (card.value === 'command') {
-    // Command handled separately — just advance turn
-    addLog(`${G.players[playerId]?.name} issued a Command!`, 'log-special');
-    showCardEffect('command', 'COMMAND!');
-    advanceTurn(1);
-
-  } else {
-    advanceTurn(1);
-  }
-}
-function checkWin(playerId) {
-  if (!G.hands[playerId] || G.hands[playerId].length > 0) return false;
-  G.over = true;
-  G.winner = playerId;
-  const p = G.players[playerId];
-  if (p) p.score = (p.score||0)+1;
-  addLog(`${G.players[playerId]?.name} wins this round!`, 'log-warn');
-  stopTurnTimer();
-  clearTimeout(_aiThinkTimeout);
-  playSound('win');
-  return true;
-}
-function reshuffleDeck() { G.deck = shuffle(buildDeck()); }
-function addLog(text, cls='') { G.log = G.log||[]; G.log.push({ text, cls }); }
-
-// ═══════════════════════════════════════════════════════════════
-// CARD EFFECTS
-// ═══════════════════════════════════════════════════════════════
-let _effectTimeout = null;
-function showCardEffect(type, text) {
-  const overlay = document.getElementById('effect-overlay');
-  const textEl = document.getElementById('effect-text');
-  clearTimeout(_effectTimeout);
-  overlay.className = `effect-overlay effect-overlay-${type} show`;
-  textEl.textContent = text;
-  textEl.style.animation = 'none';
-  requestAnimationFrame(() => { textEl.style.animation = ''; });
-  _effectTimeout = setTimeout(() => { overlay.classList.remove('show'); }, 900);
-}
-
-function setDiscardEffect(card) {
-  const pile = document.getElementById('discard-pile');
-  pile.className = 'discard-pile';
-  if (card.value === 'skip') pile.classList.add('discard-special-skip');
-  else if (card.value === 'reverse') pile.classList.add('discard-special-reverse');
-  else if (card.value === 'draw2' || card.value === 'wild4') pile.classList.add('discard-special-draw');
-  else if (card.value === 'wild') pile.classList.add('discard-special-wild');
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TURN TIMER
-// ═══════════════════════════════════════════════════════════════
-function startTurnTimer() {
-  stopTurnTimer();
-  if (!G||!G.started||G.over) return;
-  _turnTimerRemaining = TURN_SECONDS;
-  _updateTimerUI(TURN_SECONDS);
-  document.getElementById('topbar-timer').style.display = '';
-  document.getElementById('hand-timer-bar').classList.add('visible');
-  _turnTimerInterval = setInterval(() => {
-    _turnTimerRemaining--;
-    _updateTimerUI(_turnTimerRemaining);
-    if (_turnTimerRemaining <= 0) { stopTurnTimer(); onTimerExpired(); }
-  }, 1000);
-}
-function stopTurnTimer() {
-  clearInterval(_turnTimerInterval); _turnTimerInterval = null;
-  document.getElementById('topbar-timer').style.display = 'none';
-  document.getElementById('hand-timer-bar').classList.remove('visible');
-}
-function _updateTimerUI(secs) {
-  const timerEl=document.getElementById('topbar-timer');
-  const numEl=document.getElementById('topbar-timer-num');
-  const ringFg=document.getElementById('timer-ring-fg');
-  const barFill=document.getElementById('hand-timer-fill');
-  numEl.textContent=Math.max(0,secs);
-  const frac=secs/TURN_SECONDS;
-  ringFg.style.strokeDashoffset=RING_CIRC*(1-frac);
-  timerEl.classList.remove('warn','crit');
-  barFill.classList.remove('warn','crit');
-  if (secs<=5){timerEl.classList.add('crit');barFill.classList.add('crit'); playSound('urgentTick');}
-  else if (secs<=10){timerEl.classList.add('warn');barFill.classList.add('warn'); playSound('tick');}
-  barFill.style.width=Math.max(0,frac*100)+'%';
-}
-function onTimerExpired() {
-  if (!G||G.over) return;
-  const curId = G.turnOrder[G.currentTurnIdx];
-  if (isAiId(curId)) return;
-  if (curId === MY_ID) {
-    showToast("⏱ Time's up! Auto-drew.", 'fa-clock');
-    if (isHost) processAction({ type:'timer_draw', playerId:MY_ID });
-    else { broadcast('game_action',{type:'timer_draw',playerId:MY_ID}); renderGame(); }
-  } else if (isHost) {
-    processAction({ type:'timer_draw', playerId:curId });
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// AI ENGINE
-// ═══════════════════════════════════════════════════════════════
-function maybeScheduleAiTurn() {
-  if (!isAiMode||!G||!G.started||G.over) return;
-  const curId = G.turnOrder[G.currentTurnIdx];
-  if (!isAiId(curId)) return;
-  clearTimeout(_aiThinkTimeout);
-  const thinkMs = CFG.AI_THINK_MIN + Math.random()*(CFG.AI_THINK_MAX-CFG.AI_THINK_MIN);
-  renderPlayers();
-  _aiThinkTimeout = setTimeout(() => { renderPlayers(); executeAiTurn(curId); }, thinkMs);
-}
-
-function executeAiTurn(aiId) {
-  if (!G||G.over) return;
-  const hand = G.hands[aiId] || [];
-  const playable = hand.filter(c => isAiPlayable(c, G.topCard, G.topColor, G.drawStack));
-  const aiName = G.players[aiId]?.name || 'AI';
-  const personality = AI_PERSONALITIES[aiName] || AI_PERSONALITIES.Blaze;
-
-  if (playable.length === 0) {
-    processAction({ type:'draw_card', playerId:aiId });
-    if (hand.length === 1) {
-      setTimeout(() => {
-        showToast(`${aiName}: ${personality.unoTaunt}`,'fa-robot',3500);
-        addLog(`${aiName} shouted UNO!`,'log-ai');
-        renderLog();
-      }, 400);
-    }
-    return;
-  }
-
-  // Personality-driven card selection
-  let chosen = null;
-  const actionValues = ['skip','reverse','draw2','wild4'];
-
-  if (personality.style === 'aggressive') {
-    // Prioritize draw cards and skips aggressively
-    for (const v of ['wild4','draw2','skip','reverse']) {
-      const f=playable.find(c=>c.value===v); if(f){chosen=f;break;}
-    }
-  } else if (personality.style === 'troll') {
-    // Random chaos — pick randomly from playable
-    chosen = playable[Math.floor(Math.random()*playable.length)];
-  } else {
-    // Smart: maximize color matches, preserve wilds
-    for (const v of actionValues) { const f=playable.find(c=>c.value===v&&c.color===G.topColor); if(f){chosen=f;break;} }
-    if (!chosen) chosen = playable.find(c=>c.color===G.topColor);
-    if (!chosen) chosen = playable.find(c=>c.value===G.topCard.value);
-  }
-  if (!chosen) chosen = playable.find(c=>c.color==='black');
-  if (!chosen) chosen = playable[0];
-
-  let chosenColor = null;
-  if (chosen.color === 'black') {
-    const cc={red:0,blue:0,green:0,yellow:0};
-    for(const c of hand) if(CARD_COLORS.includes(c.color)) cc[c.color]++;
-    chosenColor = Object.entries(cc).sort((a,b)=>b[1]-a[1])[0][0];
-  }
-
-  // Occasional AI taunts in chat (15% chance)
-  if (Math.random() < 0.15 && personality.taunts) {
-    const taunt = personality.taunts[Math.floor(Math.random()*personality.taunts.length)];
-    setTimeout(() => addChatMessage({ playerId:aiId, name:aiName }, null, false,
-      `<span class="chat-msg-name" style="color:var(--ai-color);">${aiName}:</span><span class="chat-msg-text"> ${taunt}</span>`
-    ), 600);
-  }
-
-  if (hand.length === 2) {
-    setTimeout(() => {
-      showToast(`${aiName}: ${personality.unoTaunt}`,'fa-robot',3500);
-      playSound('uno');
-      addLog(`${aiName} shouted UNO!`,'log-ai');
-      renderLog();
-    }, 400);
-  }
-  playSound('play');
-  processAction({ type:'play_card', playerId:aiId, card:chosen, chosenColor });
-}
-
-// ═══════════════════════════════════════════════════════════════
-// LOCAL ACTIONS
-// ═══════════════════════════════════════════════════════════════
-function selectCard(idx) {
-  if (!isMyTurn()) { showToast('Not your turn!','fa-hourglass-half'); return; }
-  const card = G.myHand[idx];
-
-  if (houseRules.multistack && selectedIndices.length > 0) {
-    // Try to add to stack
-    const alreadySelected = selectedIndices.indexOf(idx);
-    if (alreadySelected !== -1) {
-      selectedIndices.splice(alreadySelected,1);
-    } else {
-      const baseCard = G.myHand[selectedIndices[0]];
-      if (card.value === baseCard.value && CARD_COLORS.includes(card.color) && CARD_COLORS.includes(baseCard.color)) {
-        if (!selectedIndices.includes(idx)) selectedIndices.push(idx);
-      } else {
-        // Switch to this card only
-        selectedIndices = [idx];
-      }
-    }
-  } else {
-    selectedIndices = selectedIndices[0] === idx ? [] : [idx];
-  }
-
-  renderHand();
-  const hasSelected = selectedIndices.length > 0;
-  document.getElementById('play-btn').disabled = !hasSelected;
-  document.getElementById('play-btn-count').style.display = selectedIndices.length > 1 ? '' : 'none';
-  document.getElementById('play-btn-count').textContent = ` (${selectedIndices.length})`;
-
-  const stackBar = document.getElementById('stack-mode-indicator');
-  stackBar.style.display = selectedIndices.length > 0 && houseRules.multistack ? '' : 'none';
-  document.getElementById('stack-count-badge').textContent = selectedIndices.length;
-}
-
-function playSelected() {
-  if (selectedIndices.length === 0 || !isMyTurn()) return;
-  const cards = selectedIndices.map(i => G.myHand[i]);
-
-  // Check all cards are playable
-  const firstCard = cards[0];
-  if (!isPlayable(firstCard)) {
-    const el = document.querySelector('.card-img-wrap.selected');
-    if (el) { el.classList.add('card-invalid-shake'); setTimeout(()=>el.classList.remove('card-invalid-shake'),450); }
-    showToast("Can't play that card right now!",'fa-ban');
-    return;
-  }
-
-  if (cards.length === 1 && firstCard.color === 'black' && firstCard.value !== 'command') {
-    document.getElementById('color-modal').classList.add('show');
-    return;
-  }
-
-  // Command card
-  if (cards.length === 1 && firstCard.value === 'command') {
-    document.getElementById('command-card-inp').value = '';
-    document.getElementById('command-modal').classList.add('show');
-    return;
-  }
-
-  // 7-swap
-  if (cards.length === 1 && firstCard.value === '7' && houseRules.seven) {
-    openSwapModal();
-    return;
-  }
-
-  executePlay(cards, null);
-}
-
-function executePlay(cards, chosenColor, swapTargetId=null, commandText=null) {
-  clearTimeout(_aiThinkTimeout);
-  stopTurnTimer();
-  const indices = [...selectedIndices].sort((a,b)=>b-a);
-  for (const i of indices) G.myHand.splice(i,1);
-  if (G.hands[MY_ID]) G.hands[MY_ID] = [...G.myHand];
-  selectedIndices = [];
-  document.getElementById('stack-mode-indicator').style.display = 'none';
-  playSound('play');
-  if (G.myHand.length === 1) setTimeout(()=>showToast('1 card left — shout UNO!','fa-exclamation'),200);
-
-  // If this is a command card, show the command text toast immediately to local player
-  if (commandText) {
-    showToast(`🃏 Command: ${commandText}`, 'fa-bolt', 5000);
-    showCardEffect('command', 'COMMAND!');
-  }
-
-  const payload = {
-    type: commandText ? 'command_card' : (cards.length > 1 ? 'play_cards' : 'play_card'),
-    playerId: MY_ID,
-    cards, card: { ...cards[0], commandText },
-    chosenColor, swapTargetId,
-  };
-  if (isHost) processAction(payload);
-  else { broadcast('game_action', payload); renderGame(); _afterTurnSetup(); }
-}
-
-function drawCardAction() {
-  if (!isMyTurn()) { showToast('Not your turn!','fa-hourglass-half'); return; }
-  clearTimeout(_aiThinkTimeout);
-  stopTurnTimer();
-  selectedIndices = [];
-  playSound('draw');
-  if (isHost) processAction({ type:'draw_card', playerId:MY_ID });
-  else { broadcast('game_action',{type:'draw_card',playerId:MY_ID}); renderGame(); _afterTurnSetup(); }
-}
-
-function pickColor(color) {
-  document.getElementById('color-modal').classList.remove('show');
-  if (selectedIndices.length === 0 || !G.myHand[selectedIndices[0]]) return;
-  const cards = selectedIndices.map(i=>G.myHand[i]);
-  executePlay(cards, color);
-}
-
-function openSwapModal() {
-  const list = document.getElementById('swap-player-list');
-  list.innerHTML = '';
-  G.turnOrder.forEach(id => {
-    if (id === MY_ID) return;
-    const p = G.players[id];
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-secondary';
-    btn.style.marginBottom = '8px';
-    btn.innerHTML = `<i class="fas fa-exchange-alt"></i> ${p.name} (${p.cardCount} cards)`;
-    btn.addEventListener('click', () => {
-      document.getElementById('swap-modal').classList.remove('show');
-      const cards = selectedIndices.map(i=>G.myHand[i]);
-      executePlay(cards, null, id);
-    });
-    list.appendChild(btn);
-  });
-  document.getElementById('swap-modal').classList.add('show');
-}
-
-function shoutUno() {
-  if (!G||!G.myHand) return;
-  if (G.myHand.length === 1) {
-    showToast('UNO! Nice call!','fa-bullhorn');
-    playSound('uno');
-    broadcast('game_action',{type:'uno_shout',playerId:MY_ID});
-    if (isHost) addLog(`${G.players[MY_ID]?.name} shouted UNO!`,'log-warn');
-  } else {
-    showToast(`You have ${G.myHand.length} cards — not UNO yet!`,'fa-times-circle');
-  }
-}
-
-function closeWinModal() {
-  document.getElementById('win-modal').classList.remove('show');
-  stopTurnTimer();
-  if (isAiMode) {
-    G.over = false;
-    showScreen('screen-lobby');
-    document.getElementById('lobby-room-box').style.display = '';
-    document.getElementById('lobby-waiting-box').style.display = 'none';
-    isAiMode = false;
-    return;
-  }
-  G.over = false;
-  showScreen('screen-lobby');
-  document.getElementById('lobby-room-box').style.display = 'none';
-  document.getElementById('lobby-waiting-box').style.display = '';
-  if (isHost) {
-    document.getElementById('btn-start-game').style.display = '';
-    document.getElementById('lobby-waiting-msg').style.display = 'none';
-    document.getElementById('room-code-display').style.display = '';
-    document.getElementById('room-code-text').textContent = roomCode;
-  }
-  updateLobbyUI();
-}
-
-// ═══════════════════════════════════════════════════════════════
-// IN-GAME CHAT
-// ═══════════════════════════════════════════════════════════════
-function initChatPanel() {
-  chatUnreadCount = 0;
-  document.getElementById('chat-messages').innerHTML = '';
-  addChatMessage(null, 'Game started! Good luck 🎮', true);
-}
-
-function toggleChat() {
-  chatOpen = !chatOpen;
-  const panel = document.getElementById('chat-panel');
-  const chevron = document.getElementById('chat-chevron');
-  if (chatOpen) {
-    panel.classList.remove('collapsed');
-    chevron.innerHTML = '<i class="fas fa-chevron-down"></i>';
-    chatUnreadCount = 0;
-    document.getElementById('chat-unread').classList.remove('show');
-    document.getElementById('chat-unread').textContent = '0';
-  } else {
-    panel.classList.add('collapsed');
-    chevron.innerHTML = '<i class="fas fa-chevron-up"></i>';
-  }
-}
-
-function sendChatMessage() {
-  const inp = document.getElementById('chat-inp');
-  const text = inp.value.trim();
-  if (!text) return;
-  inp.value = '';
-  const payload = { playerId: MY_ID, name: MY_NAME, text };
-  broadcast('chat_msg', payload);
-  addChatMessage(payload, null, false);
-}
-
-function receiveChatMessage(payload) {
-  if (payload.playerId === MY_ID) return; // we already rendered ours
-  addChatMessage(payload, null, false);
-  if (!chatOpen) {
-    chatUnreadCount++;
-    const badge = document.getElementById('chat-unread');
-    badge.textContent = chatUnreadCount;
-    badge.classList.add('show');
-  }
-}
-
-function addChatMessage(payload, systemText, isSystem, rawHtml) {
-  const container = document.getElementById('chat-messages');
-  if (!container) return;
-  const el = document.createElement('div');
-  el.className = 'chat-msg';
-  if (rawHtml) {
-    el.innerHTML = rawHtml;
-  } else if (isSystem) {
-    el.innerHTML = `<span class="chat-msg-system">${systemText}</span>`;
-  } else {
-    const isMe = payload.playerId === MY_ID;
-    el.innerHTML = `<span class="chat-msg-name ${isMe?'is-me':''}">${payload.name}:</span><span class="chat-msg-text">${escapeHtml(payload.text)}</span>`;
-  }
-  container.appendChild(el);
-  container.scrollTop = container.scrollHeight;
-}
-
-function escapeHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ═══════════════════════════════════════════════════════════════
-// RENDERING
-// ═══════════════════════════════════════════════════════════════
-function renderGame() {
-  if (!G||!G.started) return;
-  const curScreen = document.querySelector('.screen.active')?.id;
-  if (curScreen !== 'screen-uno') showScreen('screen-uno');
-  renderPlayers();
-  renderDiscardPile();
-  renderHand();
-  renderLog();
-  renderTurnState();
-  updateActiveColorLabel();
-  updateDrawStackBadge();
-  document.getElementById('uno-round').textContent = G.round||1;
-  if (G.over) showWinModal(G.winner);
-}
-
-function renderPlayers() {
-  const container = document.getElementById('uno-players');
-  container.innerHTML = '';
-  const myTurn = isMyTurn();
-  const curTurnId = G.turnOrder[G.currentTurnIdx];
-  G.turnOrder.forEach(id => {
-    const p = G.players[id];
-    if (!p) return;
-    const chip = document.createElement('div');
-    const isMe = id === MY_ID;
-    const isAiP = isAiId(id);
-    const isActive = id === curTurnId;
-    chip.className = 'player-chip' +
-      (isAiP ? ' ai-chip' : '') +
-      (isMe && myTurn ? ' active-player' : '') +
-      (!isMe && isActive ? ' other-active-player' : '');
-    const cardCountDisplay = isMe ? G.myHand.length : (p.cardCount??0);
-    const thinkingHtml = isAiP && isActive && !G.over
-      ? `<div class="ai-thinking-chip"><i class="fas fa-robot" style="font-size:8px;color:var(--ai-color);"></i><span>Thinking</span><div class="ai-dots"><span></span><span></span><span></span></div></div>`
-      : '';
-    chip.innerHTML = `
-      <div class="player-avatar" style="background:${p.color}">
-        ${isAiP ? '<i class="fas fa-robot" style="font-size:14px;"></i>' : (p.name||'?').slice(0,1).toUpperCase()}
-        <div class="card-count-badge">${cardCountDisplay}</div>
-      </div>
-      <div class="player-name">${isMe?'You':p.name}</div>
-      <div class="player-score">Score: ${p.score||0}</div>
-      ${thinkingHtml}
-    `;
-    container.appendChild(chip);
-  });
-  // Direction indicator
-  const arrow = document.getElementById('turn-arrow-path');
-  if (arrow) {
-    if (G.direction === -1) {
-      arrow.setAttribute('d','M 110 20 A 90 90 0 0 0 20 110');
-    } else {
-      arrow.setAttribute('d','M 110 20 A 90 90 0 1 1 20 110');
-    }
-  }
-}
-
-function renderDiscardPile() {
-  const pile = document.getElementById('discard-pile');
-  pile.innerHTML = '';
-  if (!G.topCard) return;
-  const el = cardEl(G.topCard, { w:80, h:120, isDiscard:true, animate:true });
-  el.classList.add('card-snap');
-  pile.appendChild(el);
-  setDiscardEffect(G.topCard);
-}
-
-function renderHand() {
-  const hand = document.getElementById('hand-cards');
-  hand.innerHTML = '';
-  if (!G.myHand || isSpectator) return;
-  G.myHand.forEach((card,i) => {
-    const el = cardEl(card, { w:52, h:78, idx:i, inHand:true });
-    el.style.animationDelay = `${i*0.03}s`;
-    hand.appendChild(el);
-  });
-  document.getElementById('play-btn').disabled = selectedIndices.length === 0;
-}
-
-function renderLog() {
-  const log = document.getElementById('game-log');
-  if (!G.log) return;
-  log.innerHTML = G.log.slice(-6).map(e=>`<div class="log-entry ${e.cls||''}">${e.text}</div>`).join('');
-}
-
-function renderTurnState() {
-  const ind = document.getElementById('turn-indicator');
-  const curId = G.turnOrder[G.currentTurnIdx];
-  const isAiTurn = isAiId(curId);
-  const spectatorEl = document.getElementById('spectator-indicator');
-
-  if (isSpectator) {
-    ind.style.display = 'none';
-    spectatorEl.style.display = '';
-    document.getElementById('hand-cards').style.display = 'none';
-    document.getElementById('action-bar')?.classList.add('hidden');
-    return;
-  }
-
-  if (isMyTurn()) {
-    ind.innerHTML = `<i class="fas fa-bolt"></i> ${G.drawStack>0?`Draw ${G.drawStack} or stack!`:'Your turn!'}`;
-    ind.className = 'turn-indicator is-your-turn';
-  } else if (isAiTurn) {
-    ind.innerHTML = `<i class="fas fa-robot"></i> ${currentTurnName()} is thinking…`;
-    ind.className = 'turn-indicator';
-  } else {
-    ind.innerHTML = `<i class="fas fa-hourglass-half"></i> ${currentTurnName()}'s turn…`;
-    ind.className = 'turn-indicator';
-  }
-}
-
-function updateActiveColorLabel() {
-  const lbl = document.getElementById('active-color-label');
-  if (!G||!G.topColor) { lbl.innerHTML=''; return; }
-  lbl.innerHTML = `<span class="active-color-dot" style="background:${COLOR_DOT[G.topColor]};"></span>`;
-}
-
-function updateDrawStackBadge() {
-  const badge = document.getElementById('draw-stack-badge');
-  if (G && G.drawStack > 0) {
-    badge.style.display = '';
-    badge.textContent = `+${G.drawStack}`;
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
-function updatePlayerChips() { if(G&&G.started) renderPlayers(); }
-
-function showWinModal(winnerId) {
-  const p = G.players[winnerId];
-  const isMe = winnerId === MY_ID;
-  const isAiWinner = isAiId(winnerId);
-  const icon = document.getElementById('win-icon');
-  icon.className = isMe ? 'fas fa-trophy win-icon' : (isAiWinner?'fas fa-robot win-icon':'fas fa-star win-icon');
-  icon.style.color = isMe ? 'var(--uno-yellow)' : (isAiWinner?'var(--ai-color)':'#a78bfa');
-  document.getElementById('win-title').textContent   = isMe?'You Win! 🎉':`${p?.name||'Player'} Wins!`;
-  document.getElementById('win-subtitle').textContent = isMe?'Great play!':(isAiWinner?'The AI beat you this time!':'Better luck next round!');
-  // Show shards earned
-  const shardsEl = document.getElementById('win-shards-earned');
-  const shardsNum = document.getElementById('win-shards-num');
-  if (shardsEl && shardsNum) {
-    const earned = isMe ? (isAiMode ? (selectedDifficulty==='hard'?50:selectedDifficulty==='chaos'?35:20) : 30) : 5;
-    shardsEl.style.display = '';
-    shardsNum.textContent = earned;
-  }
-  document.getElementById('win-modal').classList.add('show');
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TRUTH OR DARE
-// ═══════════════════════════════════════════════════════════════
-const TRUTHS = [
-  "What's the most embarrassing thing you've texted to the wrong person?",
-  "Have you ever lied to get out of plans with a friend?",
-  "What's your most irrational fear?",
-  "Have you ever pretended to be sick to skip school or work?",
-  "What's the pettiest thing you've ever done to get revenge?",
-  "What's something you've done that you'd be mortified if your parents found out?",
-  "Have you ever stalked an ex on social media? How recently?",
-  "What's the most childish thing you still do?",
-  "What's a secret you've never told anyone in this call?",
-  "What's the most trouble you've ever been in?",
-  "Have you ever ghosted someone you actually liked?",
-  "What's the biggest lie you've told and gotten away with?",
-  "What's a habit you have that you'd never admit in person?",
-  "Who here would you most want to swap lives with for a week?",
-  "What's the most cringe thing on your phone right now?",
-  "Have you ever pretended to not see someone in public to avoid them?",
-  "What's the most embarrassing thing you've done on social media?",
-  "What song do you know all the words to but would never admit?",
-  "What's the most money you've ever spent on something you regret?",
-  "Have you ever told a secret you promised to keep?",
-];
-const DARES = [
-  "Send a compliment to the 3rd person in your contact list — right now.",
-  "Speak in an accent for the next 2 rounds.",
-  "Share the last song you listened to.",
-  "Type your next 3 messages with your eyes closed.",
-  "Change your server nickname to something embarrassing for 10 minutes.",
-  "Write a 2-sentence love poem about the player to your left.",
-  "Do your best impression of another player until they guess who you are.",
-  "Send your most recent camera roll photo to the group.",
-  "Tell everyone your most recent search history item.",
-  "Sing the chorus of the last song stuck in your head.",
-  "Send a voice message of you making animal sounds for 10 seconds.",
-  "Read the last message you sent in your most recent chat, out loud.",
-  "Do 10 jumping jacks on camera right now.",
-  "Send a dramatic monologue about losing your favorite snack.",
-  "Describe your fashion sense in exactly 3 words.",
-];
-const WILDS = [
-  "Everyone must whisper everything they say for the next 2 rounds.",
-  "The group votes: the player with the worst dare idea gets a penalty dare!",
-  "Everyone skips their next turn — the wildcard player goes twice.",
-  "Next player to laugh on camera draws 2 cards.",
-  "Everyone swaps their seats (or camera angles) for the next round.",
-  "The oldest player gets to create a custom truth for the current player.",
-  "Silent round — nobody can speak for 60 seconds!",
-  "Speed round: every player must share one embarrassing fact in 30 seconds.",
-];
-
-const todState = { players:[], currentIdx:0, round:1, spun:false };
-let todAiMode = false;
-const todPromptHistory = []; // tracks recent prompts to avoid repetition
-
-function initTodWithPlayers() {
-  const BG=['#818cf8','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
-  const ids = Object.keys(lobbyPlayers);
-  todState.players = ids.map((id,i) => ({
-    id, name:lobbyPlayers[id]?.name||`P${i+1}`,
-    color:BG[i%BG.length], score:0, spotlight:i===0,
-  }));
-  todState.currentIdx = 0;
-  todState.round = 1;
-  todState.spun = false;
-  renderTod();
-}
-
-function renderTod() {
-  const container = document.getElementById('tod-players');
-  container.innerHTML = '';
-  todState.players.forEach(p => {
-    const chip = document.createElement('div');
-    chip.className = `tod-player-chip${p.spotlight?' spotlight':''}`;
-    chip.innerHTML = `
-      <div class="tod-avatar" style="background:${p.color}">${p.name.slice(0,1).toUpperCase()}</div>
-      <div class="tod-pname">${p.name}</div>
-      <div class="tod-pscore"><i class="fas fa-star" style="color:var(--uno-yellow);font-size:8px;"></i> ${p.score}</div>
-      ${p.spotlight?'<i class="fas fa-bullseye" style="position:absolute;top:-13px;color:var(--tod-pink);font-size:13px;animation:bounce 1s ease infinite;"></i>':''}
-    `;
-    container.appendChild(chip);
-  });
-  document.getElementById('tod-round').textContent = todState.round;
-  document.getElementById('tod-choice-btns').style.display = 'none';
-  document.getElementById('tod-prompt-area').innerHTML = '';
-  const icon = document.getElementById('wheel-icon');
-  if (icon) icon.className = 'fas fa-bullseye';
-  document.getElementById('wheel-label').textContent = 'Spin!';
-  todState.spun = false;
-  renderTodScoreboard();
-}
-
-function renderTodScoreboard() {
-  const area = document.getElementById('tod-scoreboard-area');
-  if (!area) return;
-  const sorted = [...todState.players].sort((a,b)=>b.score-a.score);
-  area.innerHTML = `
-    <div class="tod-scoreboard">
-      <div class="tod-scoreboard-title"><i class="fas fa-trophy"></i> Scoreboard</div>
-      ${sorted.map((p,i)=>`
-        <div class="score-row">
-          <span class="score-rank rank-${i+1}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
-          <span class="score-name">${p.name}</span>
-          <span class="score-pts">${p.score} pt${p.score!==1?'s':''}</span>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
-function spinWheel() {
-  if (todState.spun) return;
-  todState.spun = true;
-  const wheel = document.getElementById('tod-wheel');
-  wheel.classList.add('spinning');
-  playSound('play');
-  setTimeout(() => {
-    wheel.classList.remove('spinning');
-    const cur = todState.players[todState.currentIdx];
-    const icon = document.getElementById('wheel-icon');
-    if (icon) icon.className = 'fas fa-star';
-    document.getElementById('wheel-label').textContent = cur.name+'!';
-    document.getElementById('tod-choice-btns').style.display = 'flex';
-    showToast(`${cur.name}'s turn!`,'fa-bullseye');
-    if (SB) broadcast('tod_action',{type:'spin',playerName:cur.name});
-  }, 900);
-}
-
-function chooseTod(type) {
-  document.getElementById('tod-choice-btns').style.display = 'none';
-  const cur = todState.players[todState.currentIdx];
-  const useGroq = todAiMode && CFG.GROQ_API_KEY;
-  document.getElementById('tod-prompt-area').innerHTML = `
-    <div class="ai-thinking">
-      <i class="fas fa-${useGroq ? 'robot' : 'dice'}" style="color:var(--accent2);"></i>
-      <span>${useGroq ? 'AI is crafting your ' + type + '…' : 'Picking a ' + type + '…'}</span>
-      <div class="ai-thinking-dots"><span></span><span></span><span></span></div>
-    </div>`;
-  if (useGroq) {
-    generateGroqPrompt(type, cur.name).then(prompt => showPrompt(type, prompt)).catch(() => {
-      // Fallback to static on error
-      showPrompt(type, null);
-    });
-  } else {
-    setTimeout(() => showPrompt(type, null), 1200);
-  }
-}
-
-async function generateGroqPrompt(type, playerName) {
-  const players = todState.players.map(p => p.name).join(', ');
-  const round = todState.round;
-  const recent = todPromptHistory.slice(-4).map(h => `"${h}"`).join(', ');
-  const systemMsg = `You are the host of a fun party game of Truth or Dare being played on Discord. Keep everything PG-13 — fun, a little embarrassing but never offensive, sexual, or harmful. Be creative, specific, and vary your style. Never repeat prompts.`;
-  const userMsg = `Generate ONE ${type} prompt for the player named "${playerName}". 
-Players in the game: ${players}. Round: ${round}.
-${recent ? `Recent prompts used (do NOT repeat these): ${recent}` : ''}
-Rules:
-- Truth: a question they must answer honestly. Make it personal, funny, or revealing.
-- Dare: an action they must perform right now (Discord-friendly, like sending a message, making a voice, sharing a photo, etc).
-- Wild: a rule or challenge that affects ALL players.
-Reply with ONLY the prompt text. No labels, no quotes, no explanation.`;
-
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${CFG.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: 'llama3-8b-8192',
-      messages: [
-        { role: 'system', content: systemMsg },
-        { role: 'user', content: userMsg },
-      ],
-      max_tokens: 120,
-      temperature: 1.1,
-    }),
-  });
-  if (!res.ok) throw new Error('Groq error ' + res.status);
-  const data = await res.json();
-  const prompt = data.choices?.[0]?.message?.content?.trim();
-  if (!prompt) throw new Error('Empty response');
-  todPromptHistory.push(prompt);
-  if (todPromptHistory.length > 20) todPromptHistory.shift();
-  return prompt;
-}
-
-function showPrompt(type, aiPrompt) {
-  const arr = type==='truth'?TRUTHS:type==='dare'?DARES:WILDS;
-  const prompt = aiPrompt || arr[Math.floor(Math.random()*arr.length)];
-  const area = document.getElementById('tod-prompt-area');
-  const iconHtml = type==='truth'?'<i class="fas fa-comment"></i> Truth':type==='dare'?'<i class="fas fa-fire"></i> Dare':'<i class="fas fa-bolt"></i> Wild Card';
-  const aiTag = aiPrompt ? ' <span style="font-size:9px;background:rgba(129,140,248,.2);border:1px solid rgba(129,140,248,.3);border-radius:6px;padding:1px 6px;color:var(--ai-color);font-family:Nunito,sans-serif;font-weight:800;letter-spacing:.08em;vertical-align:middle;"><i class="fas fa-robot" style="font-size:7px;"></i> AI</span>' : '';
-  area.innerHTML = `
-    <div class="prompt-card ${type}-card card-play-anim">
-      <div class="prompt-type">${iconHtml}${aiTag}</div>
-      <div class="prompt-text">${prompt}</div>
-      <div class="prompt-actions">
-        <button class="prompt-action-btn btn-complete" id="tod-complete-btn">
-          <i class="fas fa-check"></i> Done!
-        </button>
-        <button class="prompt-action-btn btn-skip" id="tod-skip-btn">
-          <i class="fas fa-forward"></i> Skip (−1 pt)
-        </button>
-      </div>
-    </div>`;
-  document.getElementById('tod-complete-btn').addEventListener('click', completePrompt);
-  document.getElementById('tod-skip-btn').addEventListener('click', skipPrompt);
-}
-
-function completePrompt() {
-  const p = todState.players[todState.currentIdx];
-  p.score += 1;
-  showToast(`${p.name} completed it! +1`,'fa-check-circle');
-  playSound('play');
-  advanceTod();
-}
-function skipPrompt() {
-  const p = todState.players[todState.currentIdx];
-  p.score = Math.max(0,(p.score||0)-1);
-  showToast('Skipped! −1 pt','fa-forward');
-  advanceTod();
-}
-function advanceTod() {
-  todState.players.forEach(p=>p.spotlight=false);
-  todState.currentIdx = (todState.currentIdx+1)%todState.players.length;
-  if (todState.currentIdx===0) todState.round++;
-  todState.players[todState.currentIdx].spotlight=true;
-  setTimeout(()=>renderTod(),700);
-}
-function applyTodAction(payload) {
-  if (payload.type==='start_tod'&&!isHost) { initTodWithPlayers(); showScreen('screen-tod'); }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// SCREEN MANAGER
-// ═══════════════════════════════════════════════════════════════
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id)?.classList.add('active');
-  window.scrollTo(0,0);
-  // Show/hide shard HUD
-  const shardHud = document.getElementById('shard-hud');
-  if (shardHud) {
-    shardHud.style.display = (id === 'screen-launcher' || id === 'screen-lobby-browser') ? 'none' : '';
-  }
-  // Restart/stop floaters based on screen
-  if (id === 'screen-launcher') {
-    document.querySelectorAll('.card-floater').forEach(f=>f.remove()); // remove old
-    setTimeout(startCardFloaters, 500);
-  } else {
-    document.querySelectorAll('.card-floater').forEach(f=>f.remove());
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TOAST
-// ═══════════════════════════════════════════════════════════════
-let _toastTimer;
-function showToast(msg, iconClass='fa-info-circle', ms=2800) {
-  const t = document.getElementById('toast');
-  t.innerHTML = `<i class="fas ${iconClass}"></i> ${msg}`;
-  t.classList.add('show');
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(()=>t.classList.remove('show'), ms);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// DISCORD SDK
-// ═══════════════════════════════════════════════════════════════
-async function tryInitDiscordSdk() {
-  if (!CFG.DISCORD_CLIENT_ID) return null;
-  try {
-    const { DiscordSDK } = await import('./.proxy/esm.sh/@discord/embedded-app-sdk@1');
-    discordSdk = new DiscordSDK(CFG.DISCORD_CLIENT_ID);
-    await discordSdk.ready();
-    const { code } = await discordSdk.commands.authorize({
-      client_id: CFG.DISCORD_CLIENT_ID, response_type:'code', state:'', prompt:'none',
-      scope:['identify','guilds.members.read'],
-    });
-    return discordSdk;
-  } catch(e) { console.log('Discord SDK not available', e?.message||e); return null; }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// EVENT WIRING
-// ═══════════════════════════════════════════════════════════════
-function showShardInfo() {
-  const s = getShards();
-  showToast(`💎 You have ${s} Shards! Earn more by winning games.`, 'fa-gem', 3500);
-}
-
-// Award shards on win
-const _origShowWinModal = showWinModal;
-function showWinModal(winnerId) {
-  _origShowWinModal(winnerId);
-  if (winnerId === MY_ID) {
-    const earned = isAiMode ? (selectedDifficulty === 'hard' ? 50 : selectedDifficulty === 'chaos' ? 35 : 20) : 30;
-    setTimeout(()=>addShards(earned, 'Victory!'), 800);
-  } else {
-    // Consolation
-    setTimeout(()=>addShards(5, 'Participation'), 800);
-  }
-}
-
-// Award shards on UNO shout timing
-const _origShoutUno = shoutUno;
-function shoutUno() {
-  _origShoutUno();
-  if (G && G.myHand && G.myHand.length === 1) {
-    addShards(2, 'UNO!');
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const wire = (sel,fn) => document.querySelector(sel)?.addEventListener('click',fn);
-
-  // Launcher
-  document.querySelectorAll('.activity-card.uno-card').forEach(el=>el.addEventListener('click',()=>openLobby('uno')));
-  document.querySelectorAll('.activity-card.tod-card').forEach(el=>el.addEventListener('click',()=>openLobby('tod')));
-  document.querySelectorAll('.uno-card .launch-btn').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();openLobby('uno');}));
-  document.querySelectorAll('.tod-card .launch-btn').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();openLobby('tod');}));
-
-  // Lobby browser
-  wire('#browser-back-btn', ()=>showScreen('screen-launcher'));
-  wire('#browser-refresh-btn', refreshLobbyBrowser);
-  wire('#browser-create-btn', ()=>{ createRoom(); });
-
-  // Browser AI quick launch
-  wire('#browser-play-ai-btn', () => {
-    const type = document.getElementById('ai-game-type-select').value;
-    gameType = type;
-    if (type === 'tod') {
-      startAiTod();
-    } else {
-      const count = parseInt(document.getElementById('browser-ai-count').value, 10) || 2;
-      document.getElementById('ai-count-select').value = String(count);
-      startAiGame();
-    }
-  });
-  document.getElementById('ai-game-type-select')?.addEventListener('change', () => {
-    const isTod = document.getElementById('ai-game-type-select').value === 'tod';
-    document.getElementById('ai-opponent-count-wrap').style.display = isTod ? 'none' : '';
-    document.getElementById('browser-play-ai-btn').innerHTML = isTod
-      ? '<i class="fas fa-bullseye"></i> Start Truth or Dare'
-      : '<i class="fas fa-robot"></i> Play vs AI';
-  });
-  document.getElementById('browser-inp-name')?.addEventListener('input', () => {
-    const v = document.getElementById('browser-inp-name').value.trim();
-    document.getElementById('browser-confirm-name').disabled = v.length < 1;
-  });
-  wire('#browser-confirm-name', () => {
-    MY_NAME = document.getElementById('browser-inp-name').value.trim();
-    if (!MY_NAME) return;
-    document.getElementById('browser-name-box').style.display = 'none';
-    document.getElementById('browser-room-section').style.display = 'flex';
-    refreshLobbyBrowser();
-  });
-  document.getElementById('browser-inp-name')?.addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('browser-confirm-name').click(); });
-
-  // Join by code (lobby browser)
-  document.getElementById('browser-join-code-inp')?.addEventListener('input', () => {
-    const el = document.getElementById('browser-join-code-inp');
-    el.value = el.value.toUpperCase();
-    document.getElementById('browser-join-code-btn').disabled = el.value.trim().length < 3;
-  });
-  document.getElementById('browser-join-code-inp')?.addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('browser-join-code-btn').click(); });
-  wire('#browser-join-code-btn', () => {
-    const code = document.getElementById('browser-join-code-inp').value.trim().toUpperCase();
-    if (code.length < 3) { showToast('Enter a room code first','fa-exclamation-triangle'); return; }
-    joinLobbyFromBrowser(code, false);
-  });
-
-  // Lobby waiting room
-  wire('#lobby-back-btn', leaveLobby);
-  wire('#btn-start-game', startGame);
-  wire('#btn-play-ai', startAiGame);
-  wire('#btn-join', () => {
-    const code = document.getElementById('inp-room-code').value.trim().toUpperCase();
-    if (code.length < 3) { showToast('Enter a room code first','fa-exclamation-triangle'); return; }
-    roomCode = code; isHost = false; isAiMode = false; isSpectator = false;
-    _enterRoom();
-  });
-
-  // AI mode toggle
-  const aiToggle = document.getElementById('ai-mode-toggle');
-  aiToggle?.addEventListener('change', () => {
-    const on = aiToggle.checked;
-    document.getElementById('ai-count-row').style.display = on?'':'none';
-    document.getElementById('btn-play-ai').style.display = on?'':'none';
-  });
-
-  // House rules
-  ['rule-stack2','rule-seven','rule-zero','rule-multistack'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', onHouseRuleChange);
-  });
-
-  // Back buttons in game
-  wire('#uno-leave-btn', confirmLeaveGame);
-  wire('#tod-back-btn', ()=>{ if(confirm('Leave Truth or Dare?')) leaveLobby(); });
-
-  // UNO buttons
-  wire('#play-btn', playSelected);
-  wire('#uno-shout-btn', shoutUno);
-  wire('#draw-pile-btn', drawCardAction);
-
-  // Color picker
-  document.querySelectorAll('.color-pick-btn').forEach(btn => {
-    const colorMap={'cpb-red':'red','cpb-blue':'blue','cpb-yellow':'yellow','cpb-green':'green'};
-    for(const [cls,color] of Object.entries(colorMap)) {
-      if(btn.classList.contains(cls)){ btn.addEventListener('click',()=>pickColor(color)); break; }
-    }
-  });
-
-  // Command card modal
-  wire('#command-card-cancel', () => {
-    document.getElementById('command-modal').classList.remove('show');
-    selectedIndices = [];
-    renderHand();
-    document.getElementById('play-btn').disabled = true;
-  });
-  wire('#command-card-confirm', () => {
-    const text = document.getElementById('command-card-inp').value.trim();
-    if (!text) { showToast('Enter a command first!','fa-exclamation-triangle'); return; }
-    document.getElementById('command-modal').classList.remove('show');
-    if (selectedIndices.length === 0) return;
-    const cards = selectedIndices.map(i=>G.myHand[i]);
-    executePlay(cards, null, null, text);
-  });
-  document.getElementById('command-card-inp')?.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey) document.getElementById('command-card-confirm').click(); });
-
-  // Win modal
-  wire('#win-modal-btn', closeWinModal);
-
-  // ToD
-  wire('#tod-wheel', spinWheel);
-  document.querySelectorAll('.tod-truth-btn').forEach(b=>b.addEventListener('click',()=>chooseTod('truth')));
-  document.querySelectorAll('.tod-dare-btn').forEach(b=>b.addEventListener('click',()=>chooseTod('dare')));
-  document.querySelectorAll('.tod-wild-btn').forEach(b=>b.addEventListener('click',()=>chooseTod('wild')));
-
-  // Chat
-  wire('#chat-toggle', toggleChat);
-  wire('#chat-send', sendChatMessage);
-  document.getElementById('chat-inp')?.addEventListener('keydown', e=>{ if(e.key==='Enter') sendChatMessage(); });
-
-  // Swap modal close on backdrop
-  document.getElementById('swap-modal')?.addEventListener('click', e=>{ if(e.target===document.getElementById('swap-modal')) document.getElementById('swap-modal').classList.remove('show'); });
-
-  // Room code input
-  document.getElementById('inp-room-code')?.addEventListener('input', () => {
-    const el=document.getElementById('inp-room-code');
-    el.value=el.value.toUpperCase();
-  });
-  document.getElementById('inp-room-code')?.addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('btn-join').click(); });
-});
-
-// ═══════════════════════════════════════════════════════════════
-// SHARDS ECONOMY
-// ═══════════════════════════════════════════════════════════════
-const SHARDS_KEY = 'nixai_shards_v1';
-function getShards() { try { return parseInt(localStorage.getItem(SHARDS_KEY)||'0',10); } catch(e){return 0;} }
-function addShards(n, label) {
-  try {
-    const cur = getShards();
-    localStorage.setItem(SHARDS_KEY, String(cur + n));
-    updateShardHUD();
-    // Show floating reward
-    const pop = document.createElement('div');
-    pop.className = 'shard-reward-pop';
-    pop.innerHTML = `+${n} 💎 ${label||'Shards'}`;
-    pop.style.left = (Math.random()*40+30)+'%';
-    pop.style.top = '50%';
-    document.body.appendChild(pop);
-    setTimeout(()=>pop.remove(),1800);
-  } catch(e){}
-}
-function updateShardHUD() {
-  const el = document.getElementById('shard-count');
-  if(el) el.textContent = getShards().toLocaleString();
-}
-
-// ═══════════════════════════════════════════════════════════════
-// AI DIFFICULTY
-// ═══════════════════════════════════════════════════════════════
-let selectedDifficulty = 'normal';
-function selectDifficulty(btn, diff) {
-  selectedDifficulty = diff;
-  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  // Remap AI personalities based on difficulty
-  if (diff === 'hard') {
-    AI_NAMES.forEach(n => { if(AI_PERSONALITIES[n]) AI_PERSONALITIES[n].style = 'smart'; });
-  } else if (diff === 'chaos') {
-    AI_NAMES.forEach(n => { if(AI_PERSONALITIES[n]) AI_PERSONALITIES[n].style = 'troll'; });
-  } else {
-    // normal — restore defaults
-    AI_PERSONALITIES.Blaze.style='aggressive'; AI_PERSONALITIES.Nova.style='smart';
-    AI_PERSONALITIES.Chip.style='troll'; AI_PERSONALITIES.Orion.style='aggressive';
-    AI_PERSONALITIES.Pixel.style='troll'; AI_PERSONALITIES.Echo.style='smart';
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// LIVE STATS SIMULATION
-// ═══════════════════════════════════════════════════════════════
-function updateLiveStats() {
-  // Simulate live numbers with gentle jitter around realistic values
-  const base = { players: 24, games: 6 };
-  const pJitter = Math.floor(Math.random()*8)-3;
-  const gJitter = Math.floor(Math.random()*4)-1;
-  const players = Math.max(8, base.players + pJitter);
-  const games   = Math.max(1, base.games + gJitter);
-  const pEl = document.getElementById('stat-players');
-  const gEl = document.getElementById('stat-games');
-  if (pEl) pEl.textContent = `🔥 ${players} players online`;
-  if (gEl) gEl.textContent = `🎮 ${games} active games`;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ANIMATED CARD FLOATERS (launcher background)
-// ═══════════════════════════════════════════════════════════════
-const CARD_COLORS_FLOATERS = ['R','B','G','Y'];
-const CARD_VALS_FLOATERS = ['1','3','5','7','9','S','R','A2'];
-function spawnCardFloater() {
-  const col = CARD_COLORS_FLOATERS[Math.floor(Math.random()*4)];
-  const val = CARD_VALS_FLOATERS[Math.floor(Math.random()*CARD_VALS_FLOATERS.length)];
-  const el = document.createElement('div');
-  el.className = 'card-floater';
-  const rotStart = (Math.random()*60-30)+'deg';
-  const rotEnd = (Math.random()*60-30)+'deg';
-  const dur = (8+Math.random()*10)+'s';
-  const left = (Math.random()*95)+'%';
-  el.style.cssText = `left:${left};bottom:-120px;width:42px;height:63px;--rot-start:${rotStart};--rot-end:${rotEnd};animation-duration:${dur};animation-delay:${Math.random()*8}s;`;
-  // Card visual
-  const colorMap2={R:'#e8302c',B:'#1a73e8',G:'#2db552',Y:'#f9c023'};
-  el.style.background = `linear-gradient(145deg,${colorMap2[col]},${colorMap2[col]}bb)`;
-  el.style.border = '2px solid rgba(255,255,255,.2)';
-  el.style.borderRadius = '7px';
-  el.style.display = 'flex';el.style.alignItems='center';el.style.justifyContent='center';
-  el.style.fontFamily = 'Fredoka One,cursive';
-  el.style.fontSize = '16px';el.style.color='rgba(255,255,255,.8)';
-  el.textContent = val;
-  document.body.appendChild(el);
-  setTimeout(()=>el.remove(), parseFloat(dur)*1000+10000);
-}
-function startCardFloaters() {
-  // Only show on launcher
-  if (document.querySelector('.screen.active')?.id !== 'screen-launcher') return;
-  spawnCardFloater();
-  setTimeout(startCardFloaters, 1800+Math.random()*2000);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// SHARD REWARDS ON GAME EVENTS
-// ═══════════════════════════════════════════════════════════════
-const _origCheckWin = checkWin;
-// Wrapped in startGame / showWinModal below for shard awarding
-
-// ═══════════════════════════════════════════════════════════════
-// BOOT
-// ═══════════════════════════════════════════════════════════════
-(async function boot() {
-  tryInitDiscordSdk().catch(()=>{});
-  const hasSupa = initSupabase();
-  if (!hasSupa) console.warn('Running without Supabase.');
-  // Init live stats
-  updateLiveStats();
-  setInterval(updateLiveStats, 12000);
-  // Shard HUD
-  updateShardHUD();
-  // Start card floaters
-  setTimeout(startCardFloaters, 1500);
-})();
-</script>
-</body>
-</html>
+    } else if (nextDraw) {
+      const n = parseInt(nextDraw[1], 10) || 2;
+      G.drawStack += n;
+      addLog(`Next player must draw ${n}!`, 'log-warn');
+      showCardEffect('draw', `+${n}`);
+    } else if (reverseTurn) {
+      G.direction *= -1;
+      addLog('Direction reversed by command!', 'log-system');
+      showCardEffect('reverse', 'REVERSE!');
+    } else if (skipNext) {
+      const skips = parseInt(skipNext[1], 10) || 1;
+      addLog(`Next ${skips > 1 ? skips + ' players are' : 'player is'} skipped by command!`, 'log-special');
+      showCardEffect('skip', skips > 1 ? `SKIP ×${skips}` : 'SKIP!');
+      if (checkWin(playerId)) { broadcastFullState(); return; }
+      broadcast('command_announce', { playerName: pName, commandText: card.commandText });
+      advanceTurn(skips + 1);
+      if (!isAiMode) broadcastFullState();
+      if (G.hands && G.hands[MY_ID]) G.myHand = G.han                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
