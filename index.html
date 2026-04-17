@@ -1137,6 +1137,76 @@ body::before{
 @media(prefers-reduced-motion:reduce){
   *{animation-duration:.01ms!important;transition-duration:.01ms!important;}
 }
+
+/* ═══════════════════════════════
+   DISCORD AUTH
+═══════════════════════════════ */
+.discord-login-bar {
+  display:flex;align-items:center;justify-content:center;
+  margin-top:14px;gap:10px;flex-wrap:wrap;
+}
+.discord-login-btn {
+  display:inline-flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,#5865F2,#4752c4);
+  border:none;border-radius:12px;padding:9px 18px;
+  font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;
+  color:#fff;cursor:pointer;transition:all .2s;
+  box-shadow:0 4px 14px rgba(88,101,242,.45);letter-spacing:.02em;
+}
+.discord-login-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(88,101,242,.65);}
+.discord-login-btn svg{width:16px;height:16px;flex-shrink:0;}
+.discord-profile-chip {
+  display:none;align-items:center;gap:8px;
+  background:rgba(88,101,242,.14);border:1px solid rgba(88,101,242,.3);
+  border-radius:12px;padding:7px 13px;cursor:pointer;transition:all .2s;
+}
+.discord-profile-chip:hover{background:rgba(88,101,242,.22);}
+.discord-profile-chip.show{display:flex;}
+.dc-avatar {
+  width:28px;height:28px;border-radius:50%;
+  border:2px solid rgba(88,101,242,.5);object-fit:cover;
+  background:rgba(88,101,242,.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:900;color:#fff;flex-shrink:0;
+}
+.dc-avatar img{width:28px;height:28px;border-radius:50%;display:block;}
+.dc-name{font-size:12px;font-weight:800;color:#a5b4fc;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dc-logout{font-size:10px;color:var(--muted);margin-left:4px;font-weight:700;}
+/* Auth modal */
+.auth-modal-overlay {
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);
+  z-index:450;align-items:center;justify-content:center;
+  backdrop-filter:blur(12px);
+}
+.auth-modal-overlay.show{display:flex;}
+.auth-box {
+  background:var(--surface);border:1px solid rgba(88,101,242,.3);
+  border-radius:24px;padding:32px 26px;width:90%;max-width:360px;
+  box-shadow:0 24px 80px rgba(0,0,0,.9);animation:cardReveal .35s cubic-bezier(.34,1.56,.64,1) both;
+  text-align:center;
+}
+.auth-box-icon{font-size:48px;margin-bottom:10px;}
+.auth-box h3{font-family:'Fredoka One',cursive;font-size:22px;color:#fff;margin-bottom:8px;}
+.auth-box p{font-size:13px;color:var(--muted);font-weight:700;line-height:1.5;margin-bottom:20px;}
+.auth-feature-list{
+  display:flex;flex-direction:column;gap:7px;margin-bottom:22px;text-align:left;
+}
+.auth-feature{
+  display:flex;align-items:center;gap:9px;
+  background:rgba(255,255,255,.04);border-radius:10px;padding:8px 12px;
+  font-size:12px;font-weight:800;color:#d1d5db;
+}
+.auth-feature i{font-size:12px;color:var(--accent2);width:14px;text-align:center;}
+.auth-loading{
+  display:none;flex-direction:column;align-items:center;gap:10px;
+  font-size:13px;font-weight:700;color:var(--muted);padding:20px 0;
+}
+.auth-loading.show{display:flex;}
+.auth-spinner{
+  width:28px;height:28px;border:3px solid rgba(88,101,242,.2);
+  border-top-color:#5865F2;border-radius:50%;
+  animation:spin .8s linear infinite;
+}
 </style>
 </head>
 <body>
@@ -1153,6 +1223,36 @@ body::before{
 <div class="shard-hud" id="shard-hud" title="Your Shards" onclick="showShardInfo()">
   <span class="shard-hud-icon">💎</span>
   <span id="shard-count">0</span>
+</div>
+
+<!-- Discord Auth Modal -->
+<div class="auth-modal-overlay" id="auth-modal">
+  <div class="auth-box">
+    <div class="auth-box-icon">
+      <svg viewBox="0 0 24 24" fill="#5865F2" width="52" height="52"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.053a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.075.075 0 0 0-.041-.104 13.175 13.175 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+    </div>
+    <h3>Sign in with Discord</h3>
+    <p>Link your Discord account to sync shards, card backs, and perks across all your devices.</p>
+    <div class="auth-feature-list">
+      <div class="auth-feature"><i class="fas fa-gem"></i> Shards saved to your account</div>
+      <div class="auth-feature"><i class="fas fa-palette"></i> Card back skins persist everywhere</div>
+      <div class="auth-feature"><i class="fas fa-star"></i> Perks & shop items cloud-synced</div>
+      <div class="auth-feature"><i class="fas fa-user-circle"></i> Avatar shown in lobbies</div>
+    </div>
+    <div class="auth-loading" id="auth-loading">
+      <div class="auth-spinner"></div>
+      <span id="auth-loading-text">Connecting to Discord…</span>
+    </div>
+    <div id="auth-btn-area">
+      <button class="discord-login-btn" style="width:100%;justify-content:center;font-size:14px;padding:12px 20px;" onclick="startDiscordOAuth()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.053a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.075.075 0 0 0-.041-.104 13.175 13.175 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+        Continue with Discord
+      </button>
+      <button class="btn btn-secondary" style="width:100%;margin-top:10px;font-size:12px;" onclick="document.getElementById('auth-modal').classList.remove('show')">
+        Play as Guest
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- LAUNCHER -->
@@ -1177,6 +1277,18 @@ body::before{
       </div>
       <div style="display:flex;align-items:center;gap:6px;background:rgba(249,192,35,.1);border:1px solid rgba(249,192,35,.25);border-radius:20px;padding:5px 13px;">
         <span style="font-size:12px;font-weight:800;color:#fbbf24;" id="stat-games">🎮 — active games</span>
+      </div>
+    </div>
+    <!-- Discord Auth Bar -->
+    <div class="discord-login-bar">
+      <button class="discord-login-btn" id="discord-login-btn" onclick="showAuthModal()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.053a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.075.075 0 0 0-.041-.104 13.175 13.175 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+        Sign in with Discord
+      </button>
+      <div class="discord-profile-chip" id="discord-profile-chip" onclick="showAuthModal()">
+        <div class="dc-avatar" id="dc-avatar-wrap"></div>
+        <span class="dc-name" id="dc-username"></span>
+        <span class="dc-logout"><i class="fas fa-sign-out-alt"></i></span>
       </div>
     </div>
   </div>
@@ -2933,15 +3045,12 @@ function executeAiTurn(aiId) {
   const actionValues = ['skip','reverse','draw2','wild4'];
 
   if (personality.style === 'aggressive') {
-    // Prioritize draw cards and skips aggressively
     for (const v of ['wild4','draw2','skip','reverse']) {
       const f=playable.find(c=>c.value===v); if(f){chosen=f;break;}
     }
   } else if (personality.style === 'troll') {
-    // Random chaos — pick randomly from playable
     chosen = playable[Math.floor(Math.random()*playable.length)];
   } else {
-    // Smart: maximize color matches, preserve wilds
     for (const v of actionValues) { const f=playable.find(c=>c.value===v&&c.color===G.topColor); if(f){chosen=f;break;} }
     if (!chosen) chosen = playable.find(c=>c.color===G.topColor);
     if (!chosen) chosen = playable.find(c=>c.value===G.topCard.value);
@@ -2956,14 +3065,7 @@ function executeAiTurn(aiId) {
     chosenColor = Object.entries(cc).sort((a,b)=>b[1]-a[1])[0][0];
   }
 
-  // Occasional AI taunts in chat (15% chance)
-  if (Math.random() < 0.15 && personality.taunts) {
-    const taunt = personality.taunts[Math.floor(Math.random()*personality.taunts.length)];
-    setTimeout(() => addChatMessage({ playerId:aiId, name:aiName }, null, false,
-      `<span class="chat-msg-name" style="color:var(--ai-color);">${aiName}:</span><span class="chat-msg-text"> ${taunt}</span>`
-    ), 600);
-  }
-
+  // UNO shout on 2-card hand
   if (hand.length === 2) {
     setTimeout(() => {
       showToast(`${aiName}: ${personality.unoTaunt}`,'fa-robot',3500);
@@ -2972,6 +3074,35 @@ function executeAiTurn(aiId) {
       renderLog();
     }, 400);
   }
+
+  // Groq AI taunts — fire-and-forget, 25% chance on action cards or low hand
+  const isActionCard = ['skip','reverse','draw2','wild4','wild','command'].includes(chosen.value);
+  const isLowHand = hand.length <= 3;
+  const shouldTaunt = CFG.GROQ_API_KEY && (isActionCard ? Math.random() < 0.55 : Math.random() < 0.18 || isLowHand);
+  if (shouldTaunt) {
+    generateGroqUnoTaunt(aiName, personality.style, chosen, hand.length, chosenColor).then(taunt => {
+      if (taunt && G && !G.over) {
+        addChatMessage({ playerId:aiId, name:aiName }, null, false,
+          `<span class="chat-msg-name" style="color:var(--ai-color);">${aiName}:</span><span class="chat-msg-text"> ${taunt}</span>`
+        );
+      }
+    }).catch(()=>{
+      // Silent fallback to static taunts
+      if (Math.random() < 0.4 && personality.taunts) {
+        const t = personality.taunts[Math.floor(Math.random()*personality.taunts.length)];
+        setTimeout(() => addChatMessage({ playerId:aiId, name:aiName }, null, false,
+          `<span class="chat-msg-name" style="color:var(--ai-color);">${aiName}:</span><span class="chat-msg-text"> ${t}</span>`
+        ), 600);
+      }
+    });
+  } else if (Math.random() < 0.12 && personality.taunts) {
+    // Static fallback when Groq not configured
+    const taunt = personality.taunts[Math.floor(Math.random()*personality.taunts.length)];
+    setTimeout(() => addChatMessage({ playerId:aiId, name:aiName }, null, false,
+      `<span class="chat-msg-name" style="color:var(--ai-color);">${aiName}:</span><span class="chat-msg-text"> ${taunt}</span>`
+    ), 600);
+  }
+
   playSound('play');
   processAction({ type:'play_card', playerId:aiId, card:chosen, chosenColor });
 }
@@ -3573,6 +3704,52 @@ Reply with ONLY the prompt text. No labels, no quotes, no explanation.`;
   return prompt;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// GROQ UNO AI TAUNTS
+// ═══════════════════════════════════════════════════════════════
+const _groqTauntCache = {}; // prevent duplicate in-flight requests per AI
+async function generateGroqUnoTaunt(aiName, style, playedCard, handSize, chosenColor) {
+  if (_groqTauntCache[aiName]) return null; // already has one in flight
+  _groqTauntCache[aiName] = true;
+  try {
+    const cardDesc = playedCard.color === 'black'
+      ? `${playedCard.value === 'wild4' ? 'Wild +4' : 'Wild'} (chose ${chosenColor})`
+      : `${playedCard.color} ${VALUE_LABEL[playedCard.value] || playedCard.value}`;
+    const playerName = G?.players[MY_ID]?.name || 'the human';
+    const styleDesc = style === 'aggressive' ? 'aggressive and competitive' : style === 'troll' ? 'chaotic troll, sarcastic and unpredictable' : 'calculating and strategic';
+    const systemMsg = `You are ${aiName}, an AI playing UNO. Your personality is ${styleDesc}. You speak in short punchy chat messages — max 12 words, no emojis unless it really fits. Stay in character. PG-13 only.`;
+    const context = handSize === 1
+      ? `You just played your last card and won!`
+      : handSize <= 2
+      ? `You just played ${cardDesc} and only have ${handSize} card${handSize===1?'':'s'} left.`
+      : `You just played ${cardDesc} against ${playerName}.`;
+    const userMsg = `${context} Write a single in-character reaction. No quotes, no labels, just the message.`;
+
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${CFG.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama3-8b-8192',
+        messages: [
+          { role: 'system', content: systemMsg },
+          { role: 'user', content: userMsg },
+        ],
+        max_tokens: 40,
+        temperature: 1.2,
+      }),
+    });
+    if (!res.ok) throw new Error('Groq ' + res.status);
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() || null;
+  } finally {
+    // Allow next taunt after a cooldown
+    setTimeout(() => { delete _groqTauntCache[aiName]; }, 4000);
+  }
+}
+
 function showPrompt(type, aiPrompt) {
   const arr = type==='truth'?TRUTHS:type==='dare'?DARES:WILDS;
   const prompt = aiPrompt || arr[Math.floor(Math.random()*arr.length)];
@@ -3826,8 +4003,11 @@ function saveShards(n) { try { localStorage.setItem(SHARDS_KEY, String(n)); } ca
 function addShards(n, label) {
   try {
     const cur = getShards();
-    saveShards(cur + n);
+    const newTotal = cur + n;
+    saveShards(newTotal);
     updateShardHUD();
+    // Sync to cloud (fire-and-forget)
+    pushShardsToCloud(newTotal).catch(()=>{});
     // Show floating reward
     const pop = document.createElement('div');
     pop.className = 'shard-reward-pop';
@@ -3946,23 +4126,30 @@ function shopAction(itemId, type) {
       // Equip it
       data.equippedCardBack = itemId;
       saveShopData(data);
+      pushInventoryToCloud(itemId, 'cardBack', true, 1).catch(()=>{});
       showToast(`Equipped "${item.name}" card back!`, 'fa-check');
       renderShopItems();
       document.getElementById('shop-shard-count').textContent = getShards().toLocaleString();
       return;
     }
     if (shards < item.price) { showToast('Not enough Shards!', 'fa-times-circle'); return; }
-    saveShards(shards - item.price);
+    const newShards = shards - item.price;
+    saveShards(newShards);
+    pushShardsToCloud(newShards).catch(()=>{});
     data[itemId] = true;
     data.equippedCardBack = itemId;
     saveShopData(data);
+    pushInventoryToCloud(itemId, 'cardBack', true, 1).catch(()=>{});
     showToast(`Bought & equipped "${item.name}"! 💎`, 'fa-check-circle');
   } else {
     if (data[itemId] && !item.consumable) { showToast('Already owned!', 'fa-info-circle'); return; }
     if (shards < item.price) { showToast('Not enough Shards!', 'fa-times-circle'); return; }
-    saveShards(shards - item.price);
+    const newShards = shards - item.price;
+    saveShards(newShards);
+    pushShardsToCloud(newShards).catch(()=>{});
     data[itemId] = (data[itemId]||0) + 1;
     saveShopData(data);
+    pushInventoryToCloud(itemId, 'perk', false, data[itemId]).catch(()=>{});
     showToast(`Bought "${item.name}"! 💎`, 'fa-check-circle');
   }
   updateShardHUD();
@@ -4239,10 +4426,319 @@ function startCardFloaters() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SHARD REWARDS ON GAME EVENTS
+// DISCORD OAUTH + SUPABASE USER PERSISTENCE
 // ═══════════════════════════════════════════════════════════════
-const _origCheckWin = checkWin;
-// Wrapped in startGame / showWinModal below for shard awarding
+const DC_AUTH_KEY   = 'nixai_dc_user_v1';
+const DC_TOKEN_KEY  = 'nixai_dc_token_v1';
+
+// The redirect URI must be registered in your Discord app OAuth2 settings.
+// For local/Termux dev: use your Cloudflare tunnel URL + /oauth/callback
+// For prod: your actual domain
+function getOAuthRedirectUri() {
+  return window.location.origin + window.location.pathname;
+}
+
+function showAuthModal() {
+  const user = getDiscordUser();
+  const modal = document.getElementById('auth-modal');
+  const btnArea = document.getElementById('auth-btn-area');
+  const loading = document.getElementById('auth-loading');
+  loading.classList.remove('show');
+  btnArea.style.display = '';
+  if (user) {
+    // Show logged-in state with logout option
+    btnArea.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;background:rgba(88,101,242,.1);border:1px solid rgba(88,101,242,.25);border-radius:14px;padding:12px 14px;margin-bottom:14px;">
+        ${user.avatar_url
+          ? `<img src="${user.avatar_url}" style="width:44px;height:44px;border-radius:50%;border:2px solid rgba(88,101,242,.5);" onerror="this.outerHTML='<div style=\\'width:44px;height:44px;border-radius:50%;background:rgba(88,101,242,.3);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;\\'>${(user.username||'?').slice(0,1).toUpperCase()}</div>'">`
+          : `<div style="width:44px;height:44px;border-radius:50%;background:rgba(88,101,242,.3);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;">${(user.username||'?').slice(0,1).toUpperCase()}</div>`
+        }
+        <div style="flex:1;text-align:left;">
+          <div style="font-weight:900;font-size:14px;color:#fff;">${user.username}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px;">Discord account linked ✓</div>
+        </div>
+      </div>
+      <button class="btn btn-success" style="width:100%;margin-bottom:8px;" onclick="document.getElementById('auth-modal').classList.remove('show')">
+        <i class="fas fa-check"></i> Continue Playing
+      </button>
+      <button class="btn btn-danger" style="width:100%;font-size:12px;" onclick="discordLogout()">
+        <i class="fas fa-sign-out-alt"></i> Sign Out
+      </button>`;
+  }
+  modal.classList.add('show');
+}
+
+function getDiscordUser() {
+  try { return JSON.parse(localStorage.getItem(DC_AUTH_KEY) || 'null'); } catch(e) { return null; }
+}
+function saveDiscordUser(u) {
+  try { localStorage.setItem(DC_AUTH_KEY, JSON.stringify(u)); } catch(e) {}
+}
+
+function startDiscordOAuth() {
+  const state = Math.random().toString(36).slice(2,10);
+  sessionStorage.setItem('dc_oauth_state', state);
+  // Store current URL so we can restore after redirect
+  sessionStorage.setItem('dc_oauth_return', window.location.href);
+  const params = new URLSearchParams({
+    client_id: CFG.DISCORD_CLIENT_ID,
+    redirect_uri: getOAuthRedirectUri(),
+    response_type: 'code',
+    scope: 'identify',
+    state,
+  });
+  window.location.href = `https://discord.com/api/oauth2/authorize?${params}`;
+}
+
+async function handleOAuthCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code  = params.get('code');
+  const state = params.get('state');
+  if (!code) return false;
+
+  // Validate state
+  const savedState = sessionStorage.getItem('dc_oauth_state');
+  if (state && savedState && state !== savedState) {
+    showToast('OAuth state mismatch — try again', 'fa-exclamation-triangle');
+    return false;
+  }
+
+  // Clean URL
+  window.history.replaceState({}, document.title, window.location.pathname);
+
+  // Show loading in auth modal
+  const btnArea = document.getElementById('auth-btn-area');
+  const loading = document.getElementById('auth-loading');
+  document.getElementById('auth-modal').classList.add('show');
+  btnArea.style.display = 'none';
+  loading.classList.add('show');
+  document.getElementById('auth-loading-text').textContent = 'Verifying with Discord…';
+
+  try {
+    // Exchange code via Supabase Edge Function
+    // You need to deploy: supabase/functions/discord-oauth/index.ts
+    // See SQL schema + edge function code in comments below
+    const res = await fetch(`${CFG.SUPABASE_URL}/functions/v1/discord-oauth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${CFG.SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ code, redirect_uri: getOAuthRedirectUri() }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error('Edge function error: ' + err);
+    }
+
+    const { user, access_token } = await res.json();
+    if (!user?.id) throw new Error('No user returned');
+
+    document.getElementById('auth-loading-text').textContent = 'Syncing your profile…';
+
+    // Save locally
+    const dcUser = {
+      discord_id: user.id,
+      username: user.username + (user.discriminator && user.discriminator !== '0' ? '#' + user.discriminator : ''),
+      avatar_url: user.avatar
+        ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`
+        : null,
+    };
+    saveDiscordUser(dcUser);
+    if (access_token) {
+      try { localStorage.setItem(DC_TOKEN_KEY, access_token); } catch(e) {}
+    }
+
+    // Set MY_NAME from Discord if not already set
+    if (!MY_NAME) MY_NAME = dcUser.username.split('#')[0];
+
+    // Upsert profile in Supabase + load synced shards/inventory
+    await syncUserWithSupabase(dcUser);
+
+    // Update UI
+    updateDiscordProfileUI(dcUser);
+    showToast(`Welcome, ${dcUser.username}! 👋`, 'fa-check-circle', 3500);
+    document.getElementById('auth-modal').classList.remove('show');
+    return true;
+
+  } catch(e) {
+    console.error('Discord OAuth error:', e);
+    loading.classList.remove('show');
+    btnArea.style.display = '';
+    showToast('Sign-in failed — try again', 'fa-times-circle');
+    return false;
+  }
+}
+
+async function syncUserWithSupabase(dcUser) {
+  if (!SB) return;
+  try {
+    // Upsert profile
+    await SB.from('profiles').upsert({
+      discord_id: dcUser.discord_id,
+      username: dcUser.username,
+      avatar_url: dcUser.avatar_url,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'discord_id' });
+
+    // Load shards from cloud — take higher of local/cloud
+    const { data: shardRow } = await SB.from('user_shards')
+      .select('amount')
+      .eq('discord_id', dcUser.discord_id)
+      .single();
+
+    const localShards = getShards();
+    const cloudShards = shardRow?.amount ?? 0;
+    const merged = Math.max(localShards, cloudShards);
+    saveShards(merged);
+    updateShardHUD();
+
+    // If local was higher, push it up
+    if (localShards > cloudShards) {
+      await SB.from('user_shards').upsert({
+        discord_id: dcUser.discord_id,
+        amount: merged,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'discord_id' });
+    }
+
+    // Load inventory from cloud and merge with local shop data
+    const { data: invRows } = await SB.from('user_inventory')
+      .select('item_id, item_type, equipped, quantity')
+      .eq('discord_id', dcUser.discord_id);
+
+    if (invRows && invRows.length > 0) {
+      const shopData = getShopData();
+      for (const row of invRows) {
+        if (!shopData[row.item_id]) shopData[row.item_id] = row.quantity ?? true;
+        if (row.equipped && row.item_type === 'cardBack') shopData.equippedCardBack = row.item_id;
+      }
+      saveShopData(shopData);
+    }
+  } catch(e) {
+    console.warn('Supabase sync error:', e);
+  }
+}
+
+async function pushShardsToCloud(amount) {
+  const user = getDiscordUser();
+  if (!SB || !user) return;
+  try {
+    await SB.from('user_shards').upsert({
+      discord_id: user.discord_id,
+      amount,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'discord_id' });
+  } catch(e) {}
+}
+
+async function pushInventoryToCloud(itemId, itemType, equipped, quantity) {
+  const user = getDiscordUser();
+  if (!SB || !user) return;
+  try {
+    await SB.from('user_inventory').upsert({
+      discord_id: user.discord_id,
+      item_id: itemId,
+      item_type: itemType,
+      equipped: !!equipped,
+      quantity: quantity ?? 1,
+      purchased_at: new Date().toISOString(),
+    }, { onConflict: 'discord_id,item_id' });
+  } catch(e) {}
+}
+
+function discordLogout() {
+  try {
+    localStorage.removeItem(DC_AUTH_KEY);
+    localStorage.removeItem(DC_TOKEN_KEY);
+  } catch(e) {}
+  updateDiscordProfileUI(null);
+  document.getElementById('auth-modal').classList.remove('show');
+  showToast('Signed out of Discord', 'fa-sign-out-alt');
+}
+
+function updateDiscordProfileUI(user) {
+  const loginBtn  = document.getElementById('discord-login-btn');
+  const chipEl    = document.getElementById('discord-profile-chip');
+  const avatarWrap = document.getElementById('dc-avatar-wrap');
+  const nameEl    = document.getElementById('dc-username');
+  if (!loginBtn || !chipEl) return;
+  if (user) {
+    loginBtn.style.display = 'none';
+    chipEl.classList.add('show');
+    nameEl.textContent = user.username.split('#')[0];
+    if (user.avatar_url) {
+      avatarWrap.innerHTML = `<img src="${user.avatar_url}" alt="${user.username}" onerror="this.outerHTML='${(user.username||'?').slice(0,1).toUpperCase()}'">`;
+    } else {
+      avatarWrap.textContent = (user.username||'?').slice(0,1).toUpperCase();
+    }
+  } else {
+    loginBtn.style.display = '';
+    chipEl.classList.remove('show');
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   SUPABASE SQL SCHEMA  (run once in Supabase SQL editor)
+   ─────────────────────────────────────────────────────────
+create table if not exists profiles (
+  discord_id  text primary key,
+  username    text,
+  avatar_url  text,
+  updated_at  timestamptz default now()
+);
+create table if not exists user_shards (
+  discord_id  text primary key references profiles(discord_id) on delete cascade,
+  amount      int  default 0,
+  updated_at  timestamptz default now()
+);
+create table if not exists user_inventory (
+  id           uuid default gen_random_uuid() primary key,
+  discord_id   text references profiles(discord_id) on delete cascade,
+  item_id      text not null,
+  item_type    text not null,
+  equipped     boolean default false,
+  quantity     int  default 1,
+  purchased_at timestamptz default now(),
+  unique(discord_id, item_id)
+);
+alter table profiles     enable row level security;
+alter table user_shards  enable row level security;
+alter table user_inventory enable row level security;
+-- Allow edge function (service role) full access; anon read own rows:
+create policy "service full access" on profiles     using (true) with check (true);
+create policy "service full access" on user_shards  using (true) with check (true);
+create policy "service full access" on user_inventory using (true) with check (true);
+
+   EDGE FUNCTION  supabase/functions/discord-oauth/index.ts
+   ─────────────────────────────────────────────────────────
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+const CORS = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  const { code, redirect_uri } = await req.json();
+  const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: Deno.env.get("DISCORD_CLIENT_ID")!,
+      client_secret: Deno.env.get("DISCORD_CLIENT_SECRET")!,
+      grant_type: "authorization_code",
+      code, redirect_uri,
+    }),
+  });
+  if (!tokenRes.ok) return new Response(await tokenRes.text(), { status: 400, headers: CORS });
+  const { access_token } = await tokenRes.json();
+  const userRes = await fetch("https://discord.com/api/users/@me", {
+    headers: { Authorization: `Bearer ${access_token}` },
+  });
+  const user = await userRes.json();
+  return new Response(JSON.stringify({ user, access_token }), { headers: CORS });
+});
+// Deploy: supabase functions deploy discord-oauth --no-verify-jwt
+// Set secrets: supabase secrets set DISCORD_CLIENT_ID=... DISCORD_CLIENT_SECRET=...
+─────────────────────────────────────────────────────────── */
 
 // ═══════════════════════════════════════════════════════════════
 // BOOT
@@ -4251,6 +4747,19 @@ const _origCheckWin = checkWin;
   tryInitDiscordSdk().catch(()=>{});
   const hasSupa = initSupabase();
   if (!hasSupa) console.warn('Running without Supabase.');
+  // Handle Discord OAuth callback if ?code= is in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('code')) {
+    await handleOAuthCallback();
+  }
+  // Restore Discord profile chip if already logged in
+  const existingUser = getDiscordUser();
+  if (existingUser) {
+    updateDiscordProfileUI(existingUser);
+    if (!MY_NAME) MY_NAME = existingUser.username.split('#')[0];
+    // Background sync shards/inventory
+    syncUserWithSupabase(existingUser).catch(()=>{});
+  }
   // Init live stats
   updateLiveStats();
   setInterval(updateLiveStats, 12000);
