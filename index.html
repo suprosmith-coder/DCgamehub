@@ -260,7 +260,7 @@ body::before{
   background:linear-gradient(145deg,#c0221e,#e8302c);
   border-radius:9px;border:2px solid rgba(255,255,255,.2);
   display:flex;align-items:center;justify-content:center;
-  font-family:'Fredoka One',cursive;font-size:18px;color:rgba(255,255,255,.9);
+  overflow:hidden;
   box-shadow:0 4px 16px rgba(0,0,0,.5);
   transition:transform .15s ease,opacity .15s ease;
 }
@@ -298,7 +298,7 @@ body::before{
   background:linear-gradient(145deg,#c0221e,#e8302c);
   border-radius:7px;border:2px solid rgba(255,255,255,.2);
   display:flex;align-items:center;justify-content:center;
-  font-family:'Fredoka One',cursive;font-size:14px;color:rgba(255,255,255,.9);
+  overflow:hidden;
   box-shadow:0 6px 20px rgba(0,0,0,.5);
   transition:transform .32s cubic-bezier(.4,0,.2,1),top .32s cubic-bezier(.4,0,.2,1),left .32s cubic-bezier(.4,0,.2,1),opacity .2s ease;
 }
@@ -1416,8 +1416,8 @@ body::before{
       </div>
       <div class="draw-pile-btn" id="draw-pile-btn" title="Draw a card">
         <div class="draw-pile-inner">
-          <div class="card-back-css" id="draw-pile-card" style="width:62px;height:93px;position:relative;">
-            <div class="card-back-logo">UNO</div>
+          <div id="draw-pile-card" style="width:62px;height:93px;position:relative;flex-shrink:0;">
+            <img src="https://suprosmith-coder.github.io/DCgamehub/cards/UB.png" alt="Card Back" style="width:62px;height:93px;border-radius:10px;display:block;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,.5);" onerror="this.style.display='none';this.parentElement.innerHTML+='<div class=\'card-back-css\' style=\'width:62px;height:93px;\'><div class=\'card-back-logo\'>UNO</div></div>'">
             <div class="draw-stack-badge" id="draw-stack-badge" style="display:none;">0</div>
           </div>
           <div class="draw-pile-label">DRAW</div>
@@ -1919,9 +1919,20 @@ function cardEl(card, { w=56, h=84, idx=-1, inHand=false, isDiscard=false, anima
 }
 function cardBackEl(w=62, h=93) {
   const div=document.createElement('div');
-  div.className='card-back-css';
-  div.style.cssText=`width:${w}px;height:${h}px;flex-shrink:0;`;
-  div.innerHTML=`<div class="card-back-logo" style="width:${Math.round(w*.65)}px;height:${Math.round(w*.65)}px;font-size:${Math.round(w*.24)}px;">UNO</div>`;
+  div.style.cssText=`width:${w}px;height:${h}px;flex-shrink:0;position:relative;`;
+  const img=document.createElement('img');
+  img.src=CFG.CARD_PATH+'UB.png';
+  img.alt='Card Back';
+  img.style.cssText=`width:${w}px;height:${h}px;border-radius:10px;display:block;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,.5);`;
+  img.onerror=function(){
+    this.style.display='none';
+    const fb=document.createElement('div');
+    fb.className='card-back-css';
+    fb.style.cssText=`width:${w}px;height:${h}px;`;
+    fb.innerHTML=`<div class="card-back-logo" style="width:${Math.round(w*.65)}px;height:${Math.round(w*.65)}px;font-size:${Math.round(w*.24)}px;">UNO</div>`;
+    div.appendChild(fb);
+  };
+  div.appendChild(img);
   return div;
 }
 
@@ -2383,13 +2394,18 @@ function runDealAnimation(onComplete) {
     slotMap[id] = slot;
   });
 
-  // Build deck stack visual (8 stacked cards)
+  // Build deck stack visual (8 stacked cards using UB.png)
   deckArea.innerHTML = '';
   for (let i = 0; i < 8; i++) {
     const c = document.createElement('div');
     c.className = 'deal-deck-card';
     c.style.transform = `rotate(${(i - 4) * 1.5}deg) translateY(${i * -1}px)`;
-    c.textContent = 'UNO';
+    const img = document.createElement('img');
+    img.src = CFG.CARD_PATH + 'UB.png';
+    img.alt = 'Card Back';
+    img.style.cssText = 'width:66px;height:99px;border-radius:9px;display:block;object-fit:cover;';
+    img.onerror = function(){ this.style.display='none'; c.textContent='UNO'; };
+    c.appendChild(img);
     deckArea.appendChild(c);
   }
 
@@ -2446,7 +2462,12 @@ function runDealAnimation(onComplete) {
     // Animate a flying card from deck to player slot
     const flyCard = document.createElement('div');
     flyCard.className = 'deal-flying-card';
-    flyCard.textContent = 'UNO';
+    const flyImg = document.createElement('img');
+    flyImg.src = CFG.CARD_PATH + 'UB.png';
+    flyImg.alt = 'Card';
+    flyImg.style.cssText = 'width:46px;height:69px;border-radius:6px;display:block;object-fit:cover;';
+    flyImg.onerror = function(){ this.style.display='none'; flyCard.textContent='🃏'; };
+    flyCard.appendChild(flyImg);
     flyCard.style.top  = deckRect.top  + 'px';
     flyCard.style.left = deckRect.left + 'px';
     document.body.appendChild(flyCard);
