@@ -2815,6 +2815,10 @@ function checkWin(playerId) {
   stopTurnTimer();
   clearTimeout(_aiThinkTimeout);
   playSound('win');
+  // Delay so final card render shows before modal
+  setTimeout(() => {
+    renderGame(); // this calls showWinModal(G.winner) since G.over is true
+  }, 350);
   return true;
 }
 function reshuffleDeck() { G.deck = shuffle(buildDeck()); }
@@ -3226,7 +3230,7 @@ function renderGame() {
   updateActiveColorLabel();
   updateDrawStackBadge();
   document.getElementById('uno-round').textContent = G.round||1;
-  if (G.over) showWinModal(G.winner);
+  if (G.over && !document.getElementById('win-modal').classList.contains('show')) showWinModal(G.winner);
 }
 
 function renderPlayers() {
@@ -3366,9 +3370,9 @@ function showWinModal(winnerId) {
     let earned = 0;
     if (isMe) {
       if (isAiMode) {
-        earned = selectedDifficulty==='hard' ? 50 : selectedDifficulty==='chaos' ? 35 : 20;
+        earned = 20; // AI lobby win
       } else {
-        earned = 30; // multiplayer win
+        earned = 50; // multiplayer lobby win
       }
     } else {
       earned = 5; // participation shards for losing
