@@ -3270,9 +3270,14 @@ function checkWin(playerId) {
   stopTurnTimer();
   clearTimeout(_aiThinkTimeout);
   playSound('win');
+  // Handle tournament tracking
+  if (G._tournamentMatch) {
+    const isPlayerWin = playerId === MY_ID;
+    setTimeout(() => onTournamentMatchWin(isPlayerWin), 500);
+  }
   // Delay so final card render shows before modal
   setTimeout(() => {
-    renderGame(); // this calls showWinModal(G.winner) since G.over is true
+    if (G && G.over) renderGame();
   }, 350);
   return true;
 }
@@ -4861,8 +4866,6 @@ function saveDiscordUser(u) {
 function startDiscordOAuth() {
   const state = Math.random().toString(36).slice(2,10);
   sessionStorage.setItem('dc_oauth_state', state);
-  // Store current URL so we can restore after redirect
-  sessionStorage.setItem('dc_oauth_return', window.location.href);
   const params = new URLSearchParams({
     client_id: CFG.DISCORD_CLIENT_ID,
     redirect_uri: getOAuthRedirectUri(),
@@ -4870,7 +4873,127 @@ function startDiscordOAuth() {
     scope: 'identify',
     state,
   });
-  window.location.href = `https://discord.com/api/oauth2/authorize?${params}`;
+  const oauthUrl = `https://discord.com/api/oauth2/authorize?${params}`;
+
+  // ── Path 1: Discord Embedded App SDK (running inside a Discord Activity) ──
+  // Discord Activities can't open external URLs in popups or do redirects.
+  // The SDK's openExternalLink lets the user auth in their native browser and
+  // then copy the code back — we show a code-paste UI for this flow.
+  if (discordSdk) {
+    try {
+      discordSdk.commands.openExternalLink({ url: oauthUrl });
+      _showManualCodeEntry();
+      return;
+    } catch(e) {
+      // SDK call failed, fall through
+    }
+  }
+
+  // ── Path 2: Popup (normal browser outside Discord) ──
+  const popup = window.open(oauthUrl, 'discord_oauth', 'width=500,height=700,menubar=no,toolbar=no');
+  if (popup && !popup.closed) {
+    const btnArea = document.getElementById('auth-btn-area');
+    const loading = document.getElementById('auth-loading');
+    btnArea.style.display = 'none';
+    loading.classList.add('show');
+    document.getElementById('auth-loading-text').textContent = 'Waiting for Discord login…';
+
+    const poll = setInterval(async () => {
+      try {
+        if (popup.closed) {
+          clearInterval(poll);
+          loading.classList.remove('show');
+          btnArea.style.display = '';
+          return;
+        }
+        const popupUrl = popup.location.href;
+        if (popupUrl && popupUrl.includes('code=')) {
+          popup.close();
+          clearInterval(poll);
+          const code = new URLSearchParams(new URL(popupUrl).search).get('code');
+          await _exchangeOAuthCode(code);
+        }
+      } catch(e) { /* cross-origin while on discord.com — expected */ }
+    }, 500);
+    setTimeout(() => {
+      clearInterval(poll);
+      if (!popup.closed) popup.close();
+      document.getElementById('auth-loading').classList.remove('show');
+      document.getElementById('auth-btn-area').style.display = '';
+    }, 300000);
+    return;
+  }
+
+  // ── Path 3: Same-tab redirect (fallback) ──
+  window.location.href = oauthUrl;
+}
+
+function _showManualCodeEntry() {
+  // Inside Discord Activity: user opens the OAuth URL in their browser,
+  // completes login, then Discord redirects to our redirect_uri with ?code=XXX.
+  // They copy that code and paste it here.
+  const btnArea = document.getElementById('auth-btn-area');
+  btnArea.innerHTML = `
+    <div style="font-size:13px;font-weight:700;color:#d1d5db;margin-bottom:12px;line-height:1.5;">
+      Discord opened in your browser. After signing in, Discord will redirect you to a page with
+      <code style="background:rgba(255,255,255,.1);border-radius:5px;padding:1px 6px;font-size:12px;">?code=...</code>
+      in the URL. Copy that code and paste it below.
+    </div>
+    <input id="manual-oauth-code" class="inp" placeholder="Paste the code here…"
+      style="font-size:13px;letter-spacing:.05em;margin-bottom:10px;"
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <button class="discord-login-btn" style="width:100%;justify-content:center;" onclick="_submitManualCode()">
+      <i class="fas fa-check" style="margin-right:6px;"></i> Submit Code
+    </button>
+    <button class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:12px;" onclick="document.getElementById('auth-modal').classList.remove('show')">
+      Cancel
+    </button>
+  `;
+}
+
+async function _submitManualCode() {
+  const inp = document.getElementById('manual-oauth-code');
+  const code = inp?.value?.trim();
+  if (!code) { showToast('Paste the code first!', 'fa-exclamation-triangle'); return; }
+  await _exchangeOAuthCode(code);
+}
+async function _exchangeOAuthCode(code) {
+  const btnArea = document.getElementById('auth-btn-area');
+  const loading = document.getElementById('auth-loading');
+  btnArea.style.display = 'none';
+  loading.classList.add('show');
+  document.getElementById('auth-loading-text').textContent = 'Verifying with Discord…';
+  try {
+    const res = await fetch(`${CFG.SUPABASE_URL}/functions/v1/discord-oauth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${CFG.SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ code, redirect_uri: getOAuthRedirectUri() }),
+    });
+    if (!res.ok) throw new Error('Edge function error: ' + await res.text());
+    const { user, access_token } = await res.json();
+    if (!user?.id) throw new Error('No user returned');
+    document.getElementById('auth-loading-text').textContent = 'Syncing your profile…';
+    const dcUser = {
+      discord_id: user.id,
+      username: user.username + (user.discriminator && user.discriminator !== '0' ? '#' + user.discriminator : ''),
+      avatar_url: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : null,
+    };
+    saveDiscordUser(dcUser);
+    if (access_token) { try { localStorage.setItem(DC_TOKEN_KEY, access_token); } catch(e) {} }
+    if (!MY_NAME) MY_NAME = dcUser.username.split('#')[0];
+    await syncUserWithSupabase(dcUser);
+    updateDiscordProfileUI(dcUser);
+    showToast(`Welcome, ${dcUser.username}! 👋`, 'fa-check-circle', 3500);
+    document.getElementById('auth-modal').classList.remove('show');
+  } catch(e) {
+    console.error('Discord OAuth error:', e);
+    loading.classList.remove('show');
+    btnArea.style.display = '';
+    showToast('Sign-in failed — try again', 'fa-times-circle');
+  }
 }
 
 async function handleOAuthCallback() {
@@ -5805,18 +5928,7 @@ function resetTournament() {
   renderTournamentUI();
 }
 
-// Hook tournament into showWinModal
-const _origShowWinModal = showWinModal;
-// Patch checkWin to also handle tournament
-const _origCheckWin2 = checkWin;
-function checkWin(playerId) {
-  const result = _origCheckWin2(playerId);
-  if (result && G?._tournamentMatch) {
-    const isPlayerWin = playerId === MY_ID;
-    setTimeout(() => onTournamentMatchWin(isPlayerWin), 500);
-  }
-  return result;
-}
+// Tournament win is now handled directly inside checkWin above
 
 // ═══════════════════════════════════════════════════════════════
 // DAILY LOGIN BONUS
