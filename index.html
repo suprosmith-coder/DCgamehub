@@ -1207,6 +1207,254 @@ body::before{
   border-top-color:#5865F2;border-radius:50%;
   animation:spin .8s linear infinite;
 }
+
+/* ═══════════════════════════════
+   STATS / LEADERBOARD / FRIENDS
+═══════════════════════════════ */
+.big-modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);
+  z-index:410;align-items:flex-start;justify-content:center;
+  backdrop-filter:blur(12px);overflow-y:auto;padding:24px 12px 60px;
+}
+.big-modal-overlay.show{display:flex;}
+.big-modal-box{
+  background:var(--surface);border:1px solid rgba(255,255,255,.1);
+  border-radius:24px;padding:0;width:100%;max-width:460px;
+  box-shadow:0 24px 80px rgba(0,0,0,.9);animation:cardReveal .35s cubic-bezier(.34,1.56,.64,1) both;
+  overflow:hidden;
+}
+.big-modal-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px 14px;border-bottom:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.03);
+}
+.big-modal-title{font-family:'Fredoka One',cursive;font-size:20px;color:#fff;display:flex;align-items:center;gap:9px;}
+.big-modal-close{background:rgba(255,255,255,.08);border:none;color:#9ca3af;width:30px;height:30px;border-radius:8px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.big-modal-close:hover{background:rgba(255,255,255,.15);color:#fff;}
+.big-modal-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.07);}
+.bm-tab{flex:1;padding:10px;text-align:center;font-size:12px;font-weight:800;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;}
+.bm-tab.active{color:var(--accent2);border-bottom-color:var(--accent2);}
+.bm-tab:hover{color:#fff;}
+.big-modal-body{padding:18px 18px 22px;}
+
+/* Stats panel */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;}
+.stat-card{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:14px;padding:14px 12px;text-align:center;
+}
+.stat-card-val{font-family:'Fredoka One',cursive;font-size:28px;color:#fff;line-height:1;}
+.stat-card-lbl{font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+.stat-card.highlight{border-color:rgba(249,192,35,.3);background:rgba(249,192,35,.07);}
+.stat-card.highlight .stat-card-val{color:var(--uno-yellow);}
+.history-list{display:flex;flex-direction:column;gap:7px;max-height:260px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent;}
+.history-row{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+  border-radius:10px;padding:8px 11px;font-size:12px;
+}
+.history-result{
+  font-family:'Fredoka One',cursive;font-size:13px;min-width:38px;text-align:center;
+  border-radius:7px;padding:3px 7px;
+}
+.history-result.win{background:rgba(34,197,94,.18);color:#4ade80;}
+.history-result.loss{background:rgba(239,68,68,.18);color:#f87171;}
+.history-meta{flex:1;color:#9ca3af;font-weight:700;}
+.history-shards{font-family:'Fredoka One',cursive;font-size:12px;color:var(--uno-yellow);}
+
+/* Leaderboard */
+.lb-row{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:12px;transition:background .15s;
+}
+.lb-row:hover{background:rgba(255,255,255,.04);}
+.lb-row.is-me{background:rgba(88,101,242,.1);border:1px solid rgba(88,101,242,.25);}
+.lb-rank{font-family:'Fredoka One',cursive;font-size:16px;min-width:30px;text-align:center;}
+.lb-avatar{width:34px;height:34px;border-radius:50%;flex-shrink:0;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;}
+.lb-avatar img{width:34px;height:34px;border-radius:50%;object-fit:cover;display:block;}
+.lb-name{flex:1;font-size:13px;font-weight:800;}
+.lb-shards{font-family:'Fredoka One',cursive;font-size:14px;color:var(--uno-yellow);}
+.lb-wins{font-size:11px;font-weight:800;color:var(--muted);margin-left:6px;}
+.lb-divider{height:1px;background:rgba(255,255,255,.06);margin:4px 0;}
+.lb-loading{text-align:center;padding:28px 0;color:var(--muted);font-size:13px;font-weight:700;}
+
+/* Friends */
+.friends-search-row{display:flex;gap:8px;margin-bottom:14px;}
+.friends-list{display:flex;flex-direction:column;gap:7px;max-height:300px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent;}
+.friend-row{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+  border-radius:11px;padding:8px 11px;
+}
+.friend-avatar{width:34px;height:34px;border-radius:50%;flex-shrink:0;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;}
+.friend-avatar img{width:34px;height:34px;border-radius:50%;object-fit:cover;display:block;}
+.friend-name{flex:1;font-size:13px;font-weight:800;}
+.friend-status{font-size:10px;font-weight:800;display:flex;align-items:center;gap:4px;}
+.friend-status.online{color:#4ade80;}
+.friend-status.offline{color:var(--muted);}
+.friend-status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.friend-status-dot.online{background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,.6);}
+.friend-status-dot.offline{background:#374151;}
+.friend-action-btn{
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;
+  color:#d1d5db;cursor:pointer;transition:all .2s;white-space:nowrap;
+}
+.friend-action-btn:hover{background:rgba(255,255,255,.14);color:#fff;}
+.friend-action-btn.invite{background:rgba(88,101,242,.2);border-color:rgba(88,101,242,.4);color:var(--accent2);}
+.friend-action-btn.invite:hover{background:rgba(88,101,242,.35);}
+.friend-action-btn.remove{color:#f87171;border-color:rgba(239,68,68,.2);}
+.friend-action-btn.remove:hover{background:rgba(239,68,68,.15);}
+.friend-invite-banner{
+  background:rgba(88,101,242,.12);border:1px solid rgba(88,101,242,.3);
+  border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;
+  margin-bottom:10px;animation:fadeDown .3s ease both;
+}
+.friend-invite-banner-text{flex:1;font-size:12px;font-weight:800;color:var(--accent2);}
+.friend-invite-actions{display:flex;gap:6px;}
+
+/* Tournament */
+.tourn-modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);
+  z-index:420;align-items:flex-start;justify-content:center;
+  backdrop-filter:blur(14px);overflow-y:auto;padding:24px 12px 60px;
+}
+.tourn-modal-overlay.show{display:flex;}
+.tourn-box{
+  background:var(--surface);border:1px solid rgba(249,192,35,.2);
+  border-radius:24px;width:100%;max-width:460px;overflow:hidden;
+  box-shadow:0 24px 80px rgba(0,0,0,.9);animation:cardReveal .35s cubic-bezier(.34,1.56,.64,1) both;
+}
+.tourn-header{
+  background:linear-gradient(135deg,rgba(249,192,35,.15),rgba(249,192,35,.05));
+  border-bottom:1px solid rgba(249,192,35,.2);padding:18px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.tourn-title{font-family:'Fredoka One',cursive;font-size:20px;color:var(--uno-yellow);display:flex;align-items:center;gap:8px;}
+.tourn-body{padding:18px;}
+.tourn-bracket{display:flex;flex-direction:column;gap:14px;}
+.tourn-round-label{font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.tourn-match{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:12px;padding:10px 12px;
+}
+.tourn-player{flex:1;display:flex;align-items:center;gap:7px;font-size:13px;font-weight:800;}
+.tourn-player.winner{color:var(--uno-yellow);}
+.tourn-player.eliminated{color:var(--muted);text-decoration:line-through;}
+.tourn-vs{font-family:'Fredoka One',cursive;font-size:11px;color:var(--muted);}
+.tourn-result{font-family:'Fredoka One',cursive;font-size:11px;color:#4ade80;}
+.tourn-status-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  border-radius:8px;padding:3px 9px;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;
+}
+.tourn-status-badge.live{background:rgba(239,68,68,.2);color:#f87171;animation:livePulse 1.5s ease infinite;}
+.tourn-status-badge.waiting{background:rgba(249,192,35,.15);color:var(--uno-yellow);}
+.tourn-status-badge.done{background:rgba(34,197,94,.15);color:#4ade80;}
+.tourn-prize-row{
+  background:rgba(249,192,35,.08);border:1px solid rgba(249,192,35,.2);
+  border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;
+  margin-top:12px;
+}
+.tourn-prize-icon{font-size:28px;}
+.tourn-prize-text{flex:1;font-size:12px;font-weight:800;color:#d1d5db;}
+.tourn-prize-amount{font-family:'Fredoka One',cursive;font-size:20px;color:var(--uno-yellow);}
+
+/* Daily bonus */
+.daily-bonus-pop{
+  position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
+  background:rgba(249,192,35,.15);border:1px solid rgba(249,192,35,.35);
+  border-radius:16px;padding:13px 20px;z-index:390;
+  display:flex;align-items:center;gap:12px;
+  box-shadow:0 8px 32px rgba(249,192,35,.2);
+  animation:fadeUp .4s cubic-bezier(.34,1.56,.64,1) both;
+  max-width:320px;width:calc(100% - 32px);
+}
+.daily-bonus-icon{font-size:28px;}
+.daily-bonus-text{flex:1;}
+.daily-bonus-title{font-family:'Fredoka One',cursive;font-size:16px;color:var(--uno-yellow);}
+.daily-bonus-sub{font-size:11px;font-weight:800;color:#9ca3af;margin-top:2px;}
+.daily-bonus-close{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px;}
+
+/* Card back skins — applied via CSS variables */
+.skinned-card-back{
+  width:var(--cb-w,62px);height:var(--cb-h,93px);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 14px rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.15);
+  flex-shrink:0;font-family:'Fredoka One',cursive;font-size:14px;
+  color:rgba(255,255,255,.9);
+}
+<style>
+.discord-login-bar {
+  display:flex;align-items:center;justify-content:center;
+  margin-top:14px;gap:10px;flex-wrap:wrap;
+}
+.discord-login-btn {
+  display:inline-flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,#5865F2,#4752c4);
+  border:none;border-radius:12px;padding:9px 18px;
+  font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;
+  color:#fff;cursor:pointer;transition:all .2s;
+  box-shadow:0 4px 14px rgba(88,101,242,.45);letter-spacing:.02em;
+}
+.discord-login-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(88,101,242,.65);}
+.discord-login-btn svg{width:16px;height:16px;flex-shrink:0;}
+.discord-profile-chip {
+  display:none;align-items:center;gap:8px;
+  background:rgba(88,101,242,.14);border:1px solid rgba(88,101,242,.3);
+  border-radius:12px;padding:7px 13px;cursor:pointer;transition:all .2s;
+}
+.discord-profile-chip:hover{background:rgba(88,101,242,.22);}
+.discord-profile-chip.show{display:flex;}
+.dc-avatar {
+  width:28px;height:28px;border-radius:50%;
+  border:2px solid rgba(88,101,242,.5);object-fit:cover;
+  background:rgba(88,101,242,.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:900;color:#fff;flex-shrink:0;
+}
+.dc-avatar img{width:28px;height:28px;border-radius:50%;display:block;}
+.dc-name{font-size:12px;font-weight:800;color:#a5b4fc;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dc-logout{font-size:10px;color:var(--muted);margin-left:4px;font-weight:700;}
+/* Auth modal */
+.auth-modal-overlay {
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);
+  z-index:450;align-items:center;justify-content:center;
+  backdrop-filter:blur(12px);
+}
+.auth-modal-overlay.show{display:flex;}
+.auth-box {
+  background:var(--surface);border:1px solid rgba(88,101,242,.3);
+  border-radius:24px;padding:32px 26px;width:90%;max-width:360px;
+  box-shadow:0 24px 80px rgba(0,0,0,.9);animation:cardReveal .35s cubic-bezier(.34,1.56,.64,1) both;
+  text-align:center;
+}
+.auth-box-icon{font-size:48px;margin-bottom:10px;}
+.auth-box h3{font-family:'Fredoka One',cursive;font-size:22px;color:#fff;margin-bottom:8px;}
+.auth-box p{font-size:13px;color:var(--muted);font-weight:700;line-height:1.5;margin-bottom:20px;}
+.auth-feature-list{
+  display:flex;flex-direction:column;gap:7px;margin-bottom:22px;text-align:left;
+}
+.auth-feature{
+  display:flex;align-items:center;gap:9px;
+  background:rgba(255,255,255,.04);border-radius:10px;padding:8px 12px;
+  font-size:12px;font-weight:800;color:#d1d5db;
+}
+.auth-feature i{font-size:12px;color:var(--accent2);width:14px;text-align:center;}
+.auth-loading{
+  display:none;flex-direction:column;align-items:center;gap:10px;
+  font-size:13px;font-weight:700;color:var(--muted);padding:20px 0;
+}
+.auth-loading.show{display:flex;}
+.auth-spinner{
+  width:28px;height:28px;border:3px solid rgba(88,101,242,.2);
+  border-top-color:#5865F2;border-radius:50%;
+  animation:spin .8s linear infinite;
+}
 </style>
 </head>
 <body>
@@ -1291,6 +1539,18 @@ body::before{
         <span class="dc-logout"><i class="fas fa-sign-out-alt"></i></span>
       </div>
     </div>
+  </div>
+  <!-- Quick action row below Discord auth -->
+  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:6px;padding:0 16px;">
+    <button class="btn" style="background:rgba(249,192,35,.12);border:1px solid rgba(249,192,35,.25);color:var(--uno-yellow);font-size:12px;padding:7px 14px;" onclick="openStatsModal('stats')">
+      <i class="fas fa-chart-bar"></i> My Stats
+    </button>
+    <button class="btn" style="background:rgba(88,101,242,.12);border:1px solid rgba(88,101,242,.25);color:var(--accent2);font-size:12px;padding:7px 14px;" onclick="openStatsModal('lb')">
+      <i class="fas fa-trophy"></i> Leaderboard
+    </button>
+    <button class="btn" style="background:rgba(249,192,35,.12);border:1px solid rgba(249,192,35,.25);color:var(--uno-yellow);font-size:12px;padding:7px 14px;" onclick="openTournament()">
+      <i class="fas fa-crown"></i> Tournament
+    </button>
   </div>
   <div class="activity-grid">
     <div class="activity-card uno-card">
@@ -1694,6 +1954,40 @@ body::before{
   </div>
 </div>
 
+<!-- Stats / Leaderboard / Friends Modal -->
+<div class="big-modal-overlay" id="stats-modal">
+  <div class="big-modal-box">
+    <div class="big-modal-header">
+      <div class="big-modal-title" id="stats-modal-title"><i class="fas fa-chart-bar"></i> Profile</div>
+      <button class="big-modal-close" onclick="document.getElementById('stats-modal').classList.remove('show')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="big-modal-tabs">
+      <div class="bm-tab active" id="tab-stats" onclick="switchStatsTab('stats')"><i class="fas fa-chart-bar"></i> Stats</div>
+      <div class="bm-tab" id="tab-lb" onclick="switchStatsTab('lb')"><i class="fas fa-trophy"></i> Leaderboard</div>
+      <div class="bm-tab" id="tab-friends" onclick="switchStatsTab('friends')"><i class="fas fa-users"></i> Friends</div>
+    </div>
+    <div class="big-modal-body" id="stats-modal-body">
+      <div class="lb-loading"><div class="auth-spinner" style="margin:0 auto 10px;"></div>Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tournament Modal -->
+<div class="tourn-modal-overlay" id="tourn-modal">
+  <div class="tourn-box">
+    <div class="tourn-header">
+      <div class="tourn-title"><i class="fas fa-crown"></i> Tournament</div>
+      <button class="big-modal-close" onclick="closeTournament()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="tourn-body" id="tourn-body">
+      <!-- Filled by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- Daily Bonus (injected by JS) -->
+<div id="daily-bonus-anchor"></div>
+
 <!-- Win Modal -->
 <div class="modal-overlay" id="win-modal">
   <div class="modal-box win-modal-content">
@@ -1703,9 +1997,13 @@ body::before{
     <div id="win-shards-earned" style="display:none;background:rgba(249,192,35,.1);border:1px solid rgba(249,192,35,.3);border-radius:12px;padding:10px 16px;margin:10px 0;font-family:'Fredoka One',cursive;font-size:18px;color:var(--uno-yellow);">
       💎 <span id="win-shards-num">0</span> Shards Earned!
     </div>
-    <div class="btn-row" style="margin-top:16px;">
+    <div id="win-streak-display" style="display:none;font-size:12px;font-weight:800;color:#a5b4fc;margin-bottom:4px;"></div>
+    <div class="btn-row" style="margin-top:16px;gap:8px;display:flex;flex-wrap:wrap;justify-content:center;">
       <button class="btn btn-primary btn-ripple" id="win-modal-btn">
         <i class="fas fa-undo"></i> Back to Lobby
+      </button>
+      <button class="btn" id="win-rematch-btn" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 4px 14px rgba(34,197,94,.4);display:none;">
+        <i class="fas fa-redo"></i> Rematch
       </button>
     </div>
   </div>
@@ -1750,6 +2048,7 @@ let _aiThinkTimeout = null;
 let chatOpen = false;
 let chatUnreadCount = 0;
 let houseRules = { stack2: false, seven: false, zero: false, multistack: true };
+let _gameStartTime = null;
 
 const TURN_SECONDS = CFG.TURN_SECONDS;
 const RING_CIRC = 50.26;
@@ -2029,22 +2328,56 @@ function cardEl(card, { w=56, h=84, idx=-1, inHand=false, isDiscard=false, anima
   if (inHand) wrap.addEventListener('click', () => selectCard(idx));
   return wrap;
 }
+function getEquippedSkin() {
+  const data = getShopData();
+  const equipped = data.equippedCardBack || 'cb_default';
+  return SHOP_ITEMS.cardBacks.find(x => x.id === equipped) || SHOP_ITEMS.cardBacks[0];
+}
+
 function cardBackEl(w=62, h=93) {
-  const div=document.createElement('div');
-  div.style.cssText=`width:${w}px;height:${h}px;flex-shrink:0;position:relative;`;
-  const img=document.createElement('img');
-  img.src=CFG.CARD_PATH+'UB.png';
-  img.alt='Card Back';
-  img.style.cssText=`width:${w}px;height:${h}px;border-radius:10px;display:block;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,.5);`;
-  img.onerror=function(){
-    this.style.display='none';
-    const fb=document.createElement('div');
-    fb.className='card-back-css';
-    fb.style.cssText=`width:${w}px;height:${h}px;`;
-    fb.innerHTML=`<div class="card-back-logo" style="width:${Math.round(w*.65)}px;height:${Math.round(w*.65)}px;font-size:${Math.round(w*.24)}px;">UNO</div>`;
-    div.appendChild(fb);
-  };
-  div.appendChild(img);
+  const skin = getEquippedSkin();
+  const div = document.createElement('div');
+  div.style.cssText = `width:${w}px;height:${h}px;flex-shrink:0;position:relative;`;
+
+  if (skin.id === 'cb_default') {
+    // Default: use the image
+    const img = document.createElement('img');
+    img.src = CFG.CARD_PATH + 'UB.png';
+    img.alt = 'Card Back';
+    img.style.cssText = `width:${w}px;height:${h}px;border-radius:10px;display:block;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,.5);`;
+    img.onerror = function() {
+      this.style.display = 'none';
+      const fb = document.createElement('div');
+      fb.className = 'card-back-css';
+      fb.style.cssText = `width:${w}px;height:${h}px;`;
+      fb.innerHTML = `<div class="card-back-logo" style="width:${Math.round(w*.65)}px;height:${Math.round(w*.65)}px;font-size:${Math.round(w*.24)}px;">UNO</div>`;
+      div.appendChild(fb);
+    };
+    div.appendChild(img);
+  } else {
+    // Skinned: build a CSS gradient card back from the skin's colors
+    const c = skin.colors;
+    const skinDiv = document.createElement('div');
+    skinDiv.className = 'skinned-card-back';
+    skinDiv.style.cssText = `
+      --cb-w:${w}px;--cb-h:${h}px;
+      width:${w}px;height:${h}px;
+      background:linear-gradient(145deg,${c[0]},${c[1]},${c[2]},${c[3]});
+      border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.5);
+    `;
+    // Inner UNO logo circle
+    const logo = document.createElement('div');
+    logo.style.cssText = `
+      width:${Math.round(w*.55)}px;height:${Math.round(w*.55)}px;
+      border-radius:50%;background:rgba(0,0,0,.3);
+      display:flex;align-items:center;justify-content:center;
+      font-family:'Fredoka One',cursive;font-size:${Math.round(w*.2)}px;
+      color:rgba(255,255,255,.85);transform:rotate(-15deg);border:2px solid rgba(255,255,255,.2);
+    `;
+    logo.textContent = 'UNO';
+    skinDiv.appendChild(logo);
+    div.appendChild(skinDiv);
+  }
   return div;
 }
 
@@ -2104,7 +2437,13 @@ async function setupChannel(code) {
     if (!isHost) { houseRules = payload; syncHouseRulesUI(); }
   });
   await CH.subscribe(async (status) => {
-    if (status==='SUBSCRIBED') await CH.track({ id:MY_ID, name:MY_NAME, isHost, isSpectator });
+    if (status==='SUBSCRIBED') {
+      const dcUser = getDiscordUser();
+      await CH.track({
+        id: MY_ID, name: MY_NAME, isHost, isSpectator,
+        avatar_url: dcUser?.avatar_url || null,
+      });
+    }
   });
 }
 
@@ -2381,6 +2720,7 @@ function startAiGame() {
   houseRules.zero = document.getElementById('rule-zero').checked;
   houseRules.multistack = document.getElementById('rule-multistack').checked;
   const playerIds = Object.keys(lobbyPlayers);
+  _gameStartTime = Date.now();
   initGameState(playerIds);
   document.getElementById('ai-mode-badge').style.display = '';
   document.getElementById('spectator-badge').style.display = 'none';
@@ -2428,9 +2768,11 @@ function updateLobbyUI() {
     const p = lobbyPlayers[id];
     const item = document.createElement('div');
     item.className = 'lobby-player-item';
-    const initials = (p.name||'?').slice(0,1).toUpperCase();
+    const avatarContent = p.avatar_url
+      ? `<img src="${p.avatar_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;display:block;" onerror="this.outerHTML='<span style=\\'font-size:14px;font-weight:900;\\'>${(p.name||'?').slice(0,1).toUpperCase()}</span>'">`
+      : `<span style="font-size:14px;font-weight:900;">${(p.name||'?').slice(0,1).toUpperCase()}</span>`;
     item.innerHTML = `
-      <div class="lp-avatar" style="background:${BG_COLORS[i%BG_COLORS.length]}">${initials}</div>
+      <div class="lp-avatar" style="background:${BG_COLORS[i%BG_COLORS.length]};overflow:hidden;display:flex;align-items:center;justify-content:center;">${avatarContent}</div>
       <div class="lp-name">${p.name}</div>
       ${p.isHost ? '<span class="lp-badge host">HOST</span>' : ''}
       ${id===MY_ID ? '<span class="lp-badge you">YOU</span>' : ''}
@@ -2460,6 +2802,7 @@ async function startGame() {
   const playerIds = Object.keys(lobbyPlayers).filter(id => !lobbyPlayers[id]?.isSpectator);
   if (playerIds.length < 2 && SB) { showToast('Need at least 2 players to start','fa-exclamation-triangle'); return; }
   initGameState(playerIds);
+  _gameStartTime = Date.now();
   document.getElementById('ai-mode-badge').style.display = 'none';
   initChatPanel();
   broadcast('game_state', { ...getSerializableState(), screenSwitch:'dealing', houseRules });
@@ -3364,6 +3707,17 @@ function renderGame() {
   if (G.over && !document.getElementById('win-modal').classList.contains('show')) showWinModal(G.winner);
 }
 
+function getPlayerAvatar(id, name, size=38) {
+  const isAiP = isAiId(id);
+  if (isAiP) return `<i class="fas fa-robot" style="font-size:${Math.round(size*.37)}px;"></i>`;
+  // Check if this player has a Discord avatar stored in lobbyPlayers
+  const lp = lobbyPlayers[id];
+  if (lp?.avatar_url) {
+    return `<img src="${lp.avatar_url}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;display:block;" onerror="this.outerHTML='<span style=\\'font-size:${Math.round(size*.44)}px;font-weight:900;\\'>${(name||'?').slice(0,1).toUpperCase()}</span>'">`;
+  }
+  return `<span style="font-size:${Math.round(size*.44)}px;font-weight:900;">${(name||'?').slice(0,1).toUpperCase()}</span>`;
+}
+
 function renderPlayers() {
   const container = document.getElementById('uno-players');
   container.innerHTML = '';
@@ -3385,8 +3739,8 @@ function renderPlayers() {
       ? `<div class="ai-thinking-chip"><i class="fas fa-robot" style="font-size:8px;color:var(--ai-color);"></i><span>Thinking</span><div class="ai-dots"><span></span><span></span><span></span></div></div>`
       : '';
     chip.innerHTML = `
-      <div class="player-avatar" style="background:${p.color}">
-        ${isAiP ? '<i class="fas fa-robot" style="font-size:14px;"></i>' : (p.name||'?').slice(0,1).toUpperCase()}
+      <div class="player-avatar" style="background:${p.color};overflow:hidden;display:flex;align-items:center;justify-content:center;">
+        ${getPlayerAvatar(id, p.name, 38)}
         <div class="card-count-badge">${cardCountDisplay}</div>
       </div>
       <div class="player-name">${isMe?'You':p.name}</div>
@@ -3395,7 +3749,6 @@ function renderPlayers() {
     `;
     container.appendChild(chip);
   });
-  // Direction indicator
   const arrow = document.getElementById('turn-arrow-path');
   if (arrow) {
     if (G.direction === -1) {
@@ -3494,25 +3847,54 @@ function showWinModal(winnerId) {
   icon.style.color = isMe ? 'var(--uno-yellow)' : (isAiWinner?'var(--ai-color)':'#a78bfa');
   document.getElementById('win-title').textContent   = isMe?'You Win! 🎉':`${p?.name||'Player'} Wins!`;
   document.getElementById('win-subtitle').textContent = isMe?'Great play!':(isAiWinner?'The AI beat you this time!':'Better luck next round!');
-  // Award shards and show earned amount
+
+  // Award shards
   const shardsEl = document.getElementById('win-shards-earned');
   const shardsNum = document.getElementById('win-shards-num');
+  let earned = 0;
   if (shardsEl && shardsNum) {
-    let earned = 0;
     if (isMe) {
-      if (isAiMode) {
-        earned = 20; // AI lobby win
-      } else {
-        earned = 50; // multiplayer lobby win
+      earned = isAiMode ? 20 : 50;
+      // 2× shards perk
+      const shopData = getShopData();
+      if (shopData['pk_xp2'] > 0) {
+        earned *= 2;
+        shopData['pk_xp2']--;
+        if (shopData['pk_xp2'] <= 0) delete shopData['pk_xp2'];
+        saveShopData(shopData);
       }
     } else {
-      earned = 5; // participation shards for losing
+      earned = 5;
     }
     shardsEl.style.display = '';
     shardsNum.textContent = earned;
     addShards(earned, isMe ? 'Win Bonus!' : 'Participation');
   }
+
+  // Record game result + show streak
+  const duration = _gameStartTime ? Math.round((Date.now() - _gameStartTime) / 1000) : 0;
+  const playerNames = G.turnOrder.map(id => G.players[id]?.name || id).join(', ');
+  recordGameResult(isMe, earned, duration, G.players[winnerId]?.name || 'Unknown', playerNames, isAiMode);
+
+  // Show win streak
+  const streak = getWinStreak();
+  const streakEl = document.getElementById('win-streak-display');
+  if (streakEl) {
+    if (isMe && streak > 1) {
+      streakEl.textContent = `🔥 ${streak} win streak!`;
+      streakEl.style.display = '';
+    } else {
+      streakEl.style.display = 'none';
+    }
+  }
+
+  // Show rematch button for host in AI mode
+  const rematchBtn = document.getElementById('win-rematch-btn');
+  if (rematchBtn) rematchBtn.style.display = (isHost && isAiMode) ? '' : 'none';
+
   document.getElementById('win-modal').classList.add('show');
+  // Check if new shop items are now affordable
+  setTimeout(checkShopAffordability, 1200);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3970,6 +4352,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Win modal
   wire('#win-modal-btn', closeWinModal);
+  wire('#win-rematch-btn', doRematch);
 
   // ToD
   wire('#tod-wheel', spinWheel);
@@ -4741,6 +5124,759 @@ serve(async (req) => {
 ─────────────────────────────────────────────────────────── */
 
 // ═══════════════════════════════════════════════════════════════
+// GAME HISTORY — LOCAL + SUPABASE
+// ═══════════════════════════════════════════════════════════════
+const HISTORY_KEY   = 'nixai_history_v1';
+const STREAK_KEY    = 'nixai_streak_v1';
+const DAILY_KEY     = 'nixai_daily_v1';
+
+function getLocalHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveLocalHistory(arr) {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(-100))); } catch(e) {} // keep last 100
+}
+function getWinStreak() {
+  try { return parseInt(localStorage.getItem(STREAK_KEY) || '0', 10); } catch(e) { return 0; }
+}
+function saveWinStreak(n) { try { localStorage.setItem(STREAK_KEY, String(n)); } catch(e) {} }
+
+async function recordGameResult(isWin, shardsEarned, durationSecs, winnerName, playerNames, aiGame) {
+  const entry = {
+    ts: Date.now(),
+    result: isWin ? 'win' : 'loss',
+    winner: winnerName,
+    players: playerNames,
+    shards: shardsEarned,
+    duration: durationSecs,
+    ai: !!aiGame,
+  };
+  // Local history
+  const hist = getLocalHistory();
+  hist.push(entry);
+  saveLocalHistory(hist);
+  // Streak
+  if (isWin) saveWinStreak(getWinStreak() + 1);
+  else saveWinStreak(0);
+  // Supabase
+  const dcUser = getDiscordUser();
+  if (SB && dcUser) {
+    try {
+      await SB.from('game_history').insert({
+        discord_id:   dcUser.discord_id,
+        result:       entry.result,
+        winner_name:  entry.winner,
+        player_names: entry.players,
+        shards_earned: entry.shards,
+        duration_secs: entry.duration,
+        ai_game:       entry.ai,
+        played_at:     new Date().toISOString(),
+      });
+    } catch(e) { console.warn('history insert error', e); }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REMATCH
+// ═══════════════════════════════════════════════════════════════
+function doRematch() {
+  document.getElementById('win-modal').classList.remove('show');
+  if (!isHost || !isAiMode) return;
+  // Re-use same lobby player setup, just restart
+  const aiCount = parseInt(document.getElementById('ai-count-select')?.value || '2', 10);
+  lobbyPlayers = {};
+  lobbyPlayers[MY_ID] = { id: MY_ID, name: MY_NAME, isHost: true };
+  for (let i = 0; i < aiCount; i++) {
+    const aiId = AI_ID_PREFIX + i;
+    lobbyPlayers[aiId] = { id: aiId, name: AI_NAMES[i] || `AI-${i+1}`, isHost: false, isAi: true };
+  }
+  _gameStartTime = Date.now();
+  const playerIds = Object.keys(lobbyPlayers);
+  initGameState(playerIds);
+  document.getElementById('ai-mode-badge').style.display = '';
+  initChatPanel();
+  runDealAnimation(() => {
+    renderGame();
+    _afterTurnSetup();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATS / LEADERBOARD / FRIENDS MODAL
+// ═══════════════════════════════════════════════════════════════
+let _currentStatsTab = 'stats';
+
+function openStatsModal(tab = 'stats') {
+  _currentStatsTab = tab;
+  document.getElementById('stats-modal').classList.add('show');
+  switchStatsTab(tab);
+}
+
+function switchStatsTab(tab) {
+  _currentStatsTab = tab;
+  ['stats','lb','friends'].forEach(t => {
+    document.getElementById(`tab-${t}`)?.classList.toggle('active', t === tab);
+  });
+  if (tab === 'stats')   renderStatsPanel();
+  if (tab === 'lb')      renderLeaderboard();
+  if (tab === 'friends') renderFriendsPanel();
+}
+
+function renderStatsPanel() {
+  const body = document.getElementById('stats-modal-body');
+  const hist = getLocalHistory();
+  const wins   = hist.filter(h => h.result === 'win').length;
+  const losses = hist.filter(h => h.result === 'loss').length;
+  const total  = wins + losses;
+  const ratio  = total > 0 ? Math.round((wins / total) * 100) : 0;
+  const streak = getWinStreak();
+  const shards = getShards();
+  const avgDur = hist.length > 0
+    ? Math.round(hist.reduce((s,h) => s + (h.duration||0), 0) / hist.length)
+    : 0;
+  const fmtDur = avgDur > 60 ? `${Math.floor(avgDur/60)}m ${avgDur%60}s` : `${avgDur}s`;
+
+  const dcUser = getDiscordUser();
+  const avatarHtml = dcUser?.avatar_url
+    ? `<img src="${dcUser.avatar_url}" style="width:52px;height:52px;border-radius:50%;border:3px solid rgba(88,101,242,.5);object-fit:cover;">`
+    : `<div style="width:52px;height:52px;border-radius:50%;background:rgba(88,101,242,.3);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#fff;">${(MY_NAME||'?').slice(0,1).toUpperCase()}</div>`;
+
+  body.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      ${avatarHtml}
+      <div>
+        <div style="font-weight:900;font-size:15px;color:#fff;">${dcUser?.username || MY_NAME || 'Guest'}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${dcUser ? '✓ Discord linked' : 'Guest mode'}</div>
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card highlight">
+        <div class="stat-card-val">${wins}</div>
+        <div class="stat-card-lbl">Wins</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-val">${losses}</div>
+        <div class="stat-card-lbl">Losses</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-val">${ratio}%</div>
+        <div class="stat-card-lbl">Win Rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-val">${streak}🔥</div>
+        <div class="stat-card-lbl">Streak</div>
+      </div>
+      <div class="stat-card highlight">
+        <div class="stat-card-val">${shards.toLocaleString()}</div>
+        <div class="stat-card-lbl">💎 Shards</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-val">${fmtDur}</div>
+        <div class="stat-card-lbl">Avg Game</div>
+      </div>
+    </div>
+    <div style="font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Recent Games</div>
+    <div class="history-list">
+      ${hist.length === 0 ? '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;font-weight:700;">No games played yet</div>' :
+        [...hist].reverse().slice(0,20).map(h => {
+          const date = new Date(h.ts).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+          const dur = h.duration > 60 ? `${Math.floor(h.duration/60)}m` : `${h.duration}s`;
+          return `
+            <div class="history-row">
+              <div class="history-result ${h.result}">${h.result === 'win' ? 'WIN' : 'LOSS'}</div>
+              <div class="history-meta">
+                <div style="color:#d1d5db;margin-bottom:1px;">${h.winner}</div>
+                <div style="font-size:10px;">${h.ai ? '🤖 AI' : '👥 Multi'} · ${dur} · ${date}</div>
+              </div>
+              <div class="history-shards">+${h.shards} 💎</div>
+            </div>`;
+        }).join('')
+      }
+    </div>
+  `;
+}
+
+async function renderLeaderboard() {
+  const body = document.getElementById('stats-modal-body');
+  body.innerHTML = '<div class="lb-loading"><div class="auth-spinner" style="margin:0 auto 10px;"></div>Loading leaderboard…</div>';
+
+  try {
+    let rows = [];
+    if (SB) {
+      // Top 10 by shards
+      const { data: shardRows } = await SB
+        .from('user_shards')
+        .select('discord_id, amount, profiles(username, avatar_url)')
+        .order('amount', { ascending: false })
+        .limit(10);
+
+      // Win counts per player
+      const { data: winRows } = await SB
+        .from('game_history')
+        .select('discord_id')
+        .eq('result', 'win');
+
+      const winMap = {};
+      (winRows || []).forEach(r => { winMap[r.discord_id] = (winMap[r.discord_id] || 0) + 1; });
+
+      rows = (shardRows || []).map(r => ({
+        discord_id: r.discord_id,
+        username:   r.profiles?.username || 'Unknown',
+        avatar_url: r.profiles?.avatar_url || null,
+        shards:     r.amount || 0,
+        wins:       winMap[r.discord_id] || 0,
+      }));
+    }
+
+    // If no cloud data, fall back to local
+    if (rows.length === 0) {
+      const dcUser = getDiscordUser();
+      if (dcUser) {
+        rows = [{
+          discord_id: dcUser.discord_id,
+          username: dcUser.username,
+          avatar_url: dcUser.avatar_url,
+          shards: getShards(),
+          wins: getLocalHistory().filter(h => h.result === 'win').length,
+        }];
+      }
+    }
+
+    const myId = getDiscordUser()?.discord_id;
+    body.innerHTML = `
+      <div style="font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;gap:10px;">
+        <span style="flex:1;">Player</span><span>💎 Shards</span><span style="margin-left:8px;">🏆 Wins</span>
+      </div>
+      ${rows.length === 0
+        ? '<div class="lb-loading">No data yet — play some games!</div>'
+        : rows.map((r, i) => {
+            const rankEmoji = i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`;
+            const avatarHtml = r.avatar_url
+              ? `<div class="lb-avatar"><img src="${r.avatar_url}" onerror="this.outerHTML='${(r.username||'?').slice(0,1).toUpperCase()}'"></div>`
+              : `<div class="lb-avatar" style="background:rgba(88,101,242,.3);">${(r.username||'?').slice(0,1).toUpperCase()}</div>`;
+            return `
+              <div class="lb-row ${r.discord_id === myId ? 'is-me' : ''}">
+                <div class="lb-rank">${rankEmoji}</div>
+                ${avatarHtml}
+                <div class="lb-name">${r.username}${r.discord_id === myId ? ' <span style="font-size:10px;color:var(--accent2);">(you)</span>' : ''}</div>
+                <div class="lb-shards">${r.shards.toLocaleString()}</div>
+                <div class="lb-wins">${r.wins}W</div>
+              </div>
+              ${i < rows.length - 1 ? '<div class="lb-divider"></div>' : ''}`;
+          }).join('')
+      }
+    `;
+  } catch(e) {
+    body.innerHTML = '<div class="lb-loading">Could not load leaderboard.</div>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FRIENDS SYSTEM
+// ═══════════════════════════════════════════════════════════════
+const FRIENDS_KEY = 'nixai_friends_v1';
+let _pendingInvite = null; // { fromId, fromName, roomCode }
+
+function getLocalFriends() {
+  try { return JSON.parse(localStorage.getItem(FRIENDS_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveLocalFriends(arr) { try { localStorage.setItem(FRIENDS_KEY, JSON.stringify(arr)); } catch(e) {} }
+
+async function renderFriendsPanel() {
+  const body = document.getElementById('stats-modal-body');
+  const dcUser = getDiscordUser();
+
+  if (!dcUser) {
+    body.innerHTML = `
+      <div style="text-align:center;padding:30px 10px;">
+        <div style="font-size:36px;margin-bottom:10px;">👥</div>
+        <div style="font-weight:800;color:#fff;margin-bottom:6px;">Sign in to use Friends</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Link your Discord account to add friends and send lobby invites.</div>
+        <button class="discord-login-btn" style="margin:0 auto;" onclick="showAuthModal()">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.053a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.075.075 0 0 0-.041-.104 13.175 13.175 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+          Sign in with Discord
+        </button>
+      </div>`;
+    return;
+  }
+
+  body.innerHTML = '<div class="lb-loading"><div class="auth-spinner" style="margin:0 auto 10px;"></div>Loading friends…</div>';
+
+  try {
+    // Load friends from Supabase
+    let friendRows = [];
+    if (SB) {
+      const { data } = await SB
+        .from('friends')
+        .select('friend_discord_id, status, profiles!friends_friend_discord_id_fkey(username, avatar_url)')
+        .eq('discord_id', dcUser.discord_id)
+        .eq('status', 'accepted');
+      friendRows = data || [];
+    }
+
+    // Check online status via meta presence channel
+    const onlineIds = new Set();
+    if (META_CH) {
+      const state = META_CH.presenceState();
+      Object.values(state).forEach(presences => {
+        presences.forEach(p => { if (p.discord_id) onlineIds.add(p.discord_id); });
+      });
+    }
+
+    body.innerHTML = `
+      <div class="friends-search-row">
+        <input class="inp" id="friend-search-inp" placeholder="Discord ID to add friend…" style="flex:1;font-size:12px;padding:8px 11px;">
+        <button class="btn btn-primary" style="padding:8px 13px;font-size:12px;" onclick="sendFriendRequest()">
+          <i class="fas fa-user-plus"></i> Add
+        </button>
+      </div>
+      <div class="friends-list" id="friends-list">
+        ${friendRows.length === 0
+          ? '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;font-weight:700;">No friends yet — add someone!</div>'
+          : friendRows.map(r => {
+              const f = r.profiles;
+              const isOnline = onlineIds.has(r.friend_discord_id);
+              const avatarHtml = f?.avatar_url
+                ? `<div class="friend-avatar"><img src="${f.avatar_url}" onerror="this.outerHTML='${(f?.username||'?').slice(0,1).toUpperCase()}'"></div>`
+                : `<div class="friend-avatar" style="background:rgba(88,101,242,.3);">${(f?.username||'?').slice(0,1).toUpperCase()}</div>`;
+              return `
+                <div class="friend-row">
+                  ${avatarHtml}
+                  <div>
+                    <div class="friend-name">${f?.username || 'Unknown'}</div>
+                    <div class="friend-status ${isOnline?'online':'offline'}">
+                      <div class="friend-status-dot ${isOnline?'online':'offline'}"></div>
+                      ${isOnline ? 'Online' : 'Offline'}
+                    </div>
+                  </div>
+                  ${roomCode && isOnline ? `<button class="friend-action-btn invite" onclick="sendLobbyInvite('${r.friend_discord_id}','${f?.username||''}')"><i class="fas fa-paper-plane"></i> Invite</button>` : ''}
+                  <button class="friend-action-btn remove" onclick="removeFriend('${r.friend_discord_id}')"><i class="fas fa-times"></i></button>
+                </div>`;
+            }).join('')
+        }
+      </div>
+    `;
+  } catch(e) {
+    body.innerHTML = '<div class="lb-loading">Could not load friends.</div>';
+  }
+}
+
+async function sendFriendRequest() {
+  const inp = document.getElementById('friend-search-inp');
+  const targetId = inp?.value?.trim();
+  if (!targetId) return;
+  const dcUser = getDiscordUser();
+  if (!dcUser || !SB) { showToast('Sign in first!', 'fa-exclamation-triangle'); return; }
+  try {
+    await SB.from('friends').upsert([
+      { discord_id: dcUser.discord_id, friend_discord_id: targetId, status: 'pending' },
+      { discord_id: targetId, friend_discord_id: dcUser.discord_id, status: 'pending' },
+    ], { onConflict: 'discord_id,friend_discord_id' });
+    inp.value = '';
+    showToast('Friend request sent!', 'fa-check-circle');
+    renderFriendsPanel();
+  } catch(e) {
+    showToast('Could not send request', 'fa-times-circle');
+  }
+}
+
+async function removeFriend(friendId) {
+  const dcUser = getDiscordUser();
+  if (!dcUser || !SB) return;
+  try {
+    await SB.from('friends').delete()
+      .or(`and(discord_id.eq.${dcUser.discord_id},friend_discord_id.eq.${friendId}),and(discord_id.eq.${friendId},friend_discord_id.eq.${dcUser.discord_id})`);
+    showToast('Friend removed', 'fa-user-minus');
+    renderFriendsPanel();
+  } catch(e) {}
+}
+
+function sendLobbyInvite(friendDiscordId, friendName) {
+  if (!roomCode) { showToast('Create a lobby first!', 'fa-exclamation-triangle'); return; }
+  // Broadcast invite via meta channel
+  if (META_CH) {
+    META_CH.send({ type: 'broadcast', event: 'lobby_invite', payload: {
+      fromId: getDiscordUser()?.discord_id,
+      fromName: MY_NAME,
+      toId: friendDiscordId,
+      roomCode,
+    }}).catch(()=>{});
+  }
+  showToast(`Invite sent to ${friendName}!`, 'fa-paper-plane');
+}
+
+function handleLobbyInvite(payload) {
+  const myId = getDiscordUser()?.discord_id;
+  if (!myId || payload.toId !== myId) return;
+  _pendingInvite = payload;
+  // Show invite banner
+  const existing = document.getElementById('invite-banner');
+  if (existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'invite-banner';
+  banner.className = 'friend-invite-banner';
+  banner.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:380;width:calc(100% - 32px);max-width:400px;';
+  banner.innerHTML = `
+    <div class="friend-invite-banner-text">
+      <i class="fas fa-gamepad"></i> <strong>${payload.fromName}</strong> invited you to their lobby!
+    </div>
+    <div class="friend-invite-actions">
+      <button class="friend-action-btn invite" onclick="acceptLobbyInvite()"><i class="fas fa-check"></i> Join</button>
+      <button class="friend-action-btn remove" onclick="document.getElementById('invite-banner')?.remove()"><i class="fas fa-times"></i></button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+  setTimeout(() => banner.remove(), 20000);
+  playSound('uno');
+}
+
+function acceptLobbyInvite() {
+  if (!_pendingInvite) return;
+  const code = _pendingInvite.roomCode;
+  document.getElementById('invite-banner')?.remove();
+  _pendingInvite = null;
+  // Navigate to lobby browser and join
+  openLobbyBrowser('uno');
+  setTimeout(() => {
+    document.getElementById('browser-join-code-inp').value = code;
+    document.getElementById('browser-join-code-btn').disabled = false;
+    document.getElementById('browser-join-code-btn').click();
+  }, 600);
+}
+
+// Wire invite listener onto META_CH whenever it's set up
+function wireInviteListener() {
+  if (!META_CH) return;
+  META_CH.on('broadcast', { event: 'lobby_invite' }, ({ payload }) => handleLobbyInvite(payload));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOURNAMENT MODE
+// ═══════════════════════════════════════════════════════════════
+const TOURN_KEY = 'nixai_tournament_v1';
+let _tournament = null;
+
+function getStoredTournament() {
+  try { return JSON.parse(localStorage.getItem(TOURN_KEY) || 'null'); } catch(e) { return null; }
+}
+function saveTournament(t) { try { localStorage.setItem(TOURN_KEY, JSON.stringify(t)); } catch(e) {} }
+
+function openTournament() {
+  _tournament = getStoredTournament();
+  document.getElementById('tourn-modal').classList.add('show');
+  renderTournamentUI();
+}
+function closeTournament() {
+  document.getElementById('tourn-modal').classList.remove('show');
+}
+
+function renderTournamentUI() {
+  const body = document.getElementById('tourn-body');
+  if (!_tournament) {
+    body.innerHTML = `
+      <div style="text-align:center;margin-bottom:18px;">
+        <div style="font-size:36px;margin-bottom:8px;">🏆</div>
+        <div style="font-weight:800;font-size:14px;color:#fff;margin-bottom:6px;">Start a Tournament</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Single-elimination bracket vs AI. Win all rounds to claim the prize!</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px;">Players</div>
+          <select class="inp" id="tourn-size" style="cursor:pointer;font-size:12px;padding:8px 10px;">
+            <option value="4">4 Players</option>
+            <option value="8" selected>8 Players</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px;">Difficulty</div>
+          <select class="inp" id="tourn-diff" style="cursor:pointer;font-size:12px;padding:8px 10px;">
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+            <option value="chaos">Chaos</option>
+          </select>
+        </div>
+      </div>
+      <div class="tourn-prize-row">
+        <div class="tourn-prize-icon">💎</div>
+        <div class="tourn-prize-text">Win the whole bracket to earn a massive shard prize!</div>
+        <div class="tourn-prize-amount" id="tourn-prize-preview">200</div>
+      </div>
+      <button class="btn btn-primary btn-ripple" style="width:100%;margin-top:14px;font-size:14px;padding:12px;" onclick="startTournament()">
+        <i class="fas fa-crown"></i> Start Tournament
+      </button>
+    `;
+    document.getElementById('tourn-size')?.addEventListener('change', () => {
+      const size = parseInt(document.getElementById('tourn-size').value, 10);
+      document.getElementById('tourn-prize-preview').textContent = size === 8 ? '400' : '200';
+    });
+    return;
+  }
+
+  // Render bracket
+  const t = _tournament;
+  const prizeShards = t.size === 8 ? 400 : 200;
+  let html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div>
+        <div style="font-weight:900;color:#fff;font-size:14px;">${t.size}-Player Bracket</div>
+        <div style="font-size:11px;color:var(--muted);">Round ${t.currentRound} of ${Math.log2(t.size)}</div>
+      </div>
+      <div class="tourn-status-badge ${t.complete ? 'done' : 'live'}">${t.complete ? '✓ Complete' : '⚡ Live'}</div>
+    </div>`;
+
+  t.rounds.forEach((round, ri) => {
+    const roundNames = ['Quarter-Finals','Semi-Finals','Final','Champion'];
+    const label = roundNames[ri] || `Round ${ri+1}`;
+    html += `<div class="tourn-round-label">${label}</div><div class="tourn-bracket">`;
+    round.matches.forEach(m => {
+      html += `
+        <div class="tourn-match">
+          <div class="tourn-player ${m.winner === m.p1 ? 'winner' : m.winner ? 'eliminated' : ''}">
+            <span>${m.p1}</span>
+          </div>
+          <div class="tourn-vs">vs</div>
+          <div class="tourn-player ${m.winner === m.p2 ? 'winner' : m.winner ? 'eliminated' : ''}">
+            <span>${m.p2 || 'TBD'}</span>
+          </div>
+          ${m.winner ? `<div class="tourn-result">✓ ${m.winner}</div>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+  });
+
+  if (t.complete) {
+    html += `
+      <div class="tourn-prize-row" style="margin-top:14px;">
+        <div class="tourn-prize-icon">🏆</div>
+        <div class="tourn-prize-text"><strong>${t.champion}</strong> wins the tournament!</div>
+        <div class="tourn-prize-amount">+${prizeShards} 💎</div>
+      </div>
+      <button class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="resetTournament()">
+        <i class="fas fa-redo"></i> New Tournament
+      </button>`;
+  } else {
+    const nextMatch = t.rounds[t.currentRound - 1]?.matches.find(m => !m.winner);
+    if (nextMatch) {
+      html += `
+        <div style="margin-top:14px;background:rgba(249,192,35,.08);border:1px solid rgba(249,192,35,.2);border-radius:12px;padding:12px 14px;">
+          <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:var(--uno-yellow);margin-bottom:8px;">⚡ Next Match</div>
+          <div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:10px;">${nextMatch.p1} vs ${nextMatch.p2||'TBD'}</div>
+          <button class="btn btn-primary btn-ripple" style="width:100%;" onclick="playTournamentMatch()">
+            <i class="fas fa-play"></i> Play Now
+          </button>
+        </div>`;
+    }
+  }
+  body.innerHTML = html;
+}
+
+function startTournament() {
+  const size = parseInt(document.getElementById('tourn-size')?.value || '8', 10);
+  const diff = document.getElementById('tourn-diff')?.value || 'normal';
+  const aiNames = shuffle([...AI_NAMES]);
+  const players = [MY_NAME || 'You', ...aiNames.slice(0, size - 1)];
+  const shuffled = shuffle(players);
+
+  // Build round 1 matches
+  const matches = [];
+  for (let i = 0; i < shuffled.length; i += 2) {
+    matches.push({ p1: shuffled[i], p2: shuffled[i+1] || 'BYE', winner: null });
+  }
+  // Auto-win BYEs
+  matches.forEach(m => { if (m.p2 === 'BYE') m.winner = m.p1; });
+
+  _tournament = {
+    size, diff,
+    currentRound: 1,
+    rounds: [{ matches }],
+    complete: false,
+    champion: null,
+  };
+  saveTournament(_tournament);
+  closeTournament();
+  // Kick off first non-BYE match
+  const firstReal = matches.find(m => !m.winner);
+  if (firstReal) {
+    playTournamentMatch();
+  } else {
+    advanceTournamentRound();
+  }
+}
+
+function playTournamentMatch() {
+  closeTournament();
+  if (!_tournament) return;
+  const round = _tournament.rounds[_tournament.currentRound - 1];
+  const match = round?.matches.find(m => !m.winner);
+  if (!match) { advanceTournamentRound(); return; }
+
+  // Set difficulty
+  selectDifficulty({ classList: { add:()=>{}, remove:()=>{} } }, _tournament.diff);
+
+  // Build AI lobby for this match — player vs one AI
+  const isPlayerMatch = match.p1 === (MY_NAME || 'You') || match.p2 === (MY_NAME || 'You');
+  if (!isPlayerMatch) {
+    // Simulate AI vs AI — random winner
+    match.winner = Math.random() < 0.5 ? match.p1 : match.p2;
+    saveTournament(_tournament);
+    const nextReal = round.matches.find(m => !m.winner);
+    if (nextReal) playTournamentMatch();
+    else advanceTournamentRound();
+    return;
+  }
+
+  const opponentName = match.p1 === (MY_NAME || 'You') ? match.p2 : match.p1;
+  isAiMode = true;
+  isHost = true;
+  isSpectator = false;
+  roomCode = 'TOURN_' + genRoomCode();
+  lobbyPlayers = {};
+  lobbyPlayers[MY_ID] = { id: MY_ID, name: MY_NAME || 'You', isHost: true };
+  const aiId = AI_ID_PREFIX + '0';
+  // Try to pick personality matching opponent name
+  const aiName = AI_NAMES.includes(opponentName) ? opponentName : AI_NAMES[0];
+  lobbyPlayers[aiId] = { id: aiId, name: aiName, isHost: false, isAi: true };
+  _gameStartTime = Date.now();
+  const playerIds = Object.keys(lobbyPlayers);
+  initGameState(playerIds);
+  document.getElementById('ai-mode-badge').style.display = '';
+  initChatPanel();
+  // Tag game as tournament so win handler knows
+  G._tournamentMatch = match;
+  runDealAnimation(() => {
+    renderGame();
+    _afterTurnSetup();
+    startMusic();
+    showToast(`Tournament: You vs ${aiName}!`, 'fa-crown', 3000);
+  });
+}
+
+// Call this after a tournament match win
+function onTournamentMatchWin(isPlayerWin) {
+  if (!_tournament || !G?._tournamentMatch) return;
+  const match = G._tournamentMatch;
+  match.winner = isPlayerWin ? (MY_NAME || 'You') : (match.p1 === (MY_NAME||'You') ? match.p2 : match.p1);
+  saveTournament(_tournament);
+  const round = _tournament.rounds[_tournament.currentRound - 1];
+  const allDone = round.matches.every(m => m.winner);
+  if (allDone) advanceTournamentRound();
+}
+
+function advanceTournamentRound() {
+  if (!_tournament) return;
+  const lastRound = _tournament.rounds[_tournament.currentRound - 1];
+  const winners = lastRound.matches.map(m => m.winner).filter(Boolean);
+
+  if (winners.length === 1) {
+    // Tournament complete
+    _tournament.complete = true;
+    _tournament.champion = winners[0];
+    saveTournament(_tournament);
+    const prizeShards = _tournament.size === 8 ? 400 : 200;
+    if (winners[0] === (MY_NAME || 'You')) {
+      addShards(prizeShards, '🏆 Tournament!');
+      showToast(`🏆 You won the tournament! +${prizeShards} 💎`, 'fa-crown', 5000);
+    }
+    openTournament();
+    return;
+  }
+
+  // Build next round
+  const nextMatches = [];
+  for (let i = 0; i < winners.length; i += 2) {
+    nextMatches.push({ p1: winners[i], p2: winners[i+1] || 'BYE', winner: null });
+  }
+  nextMatches.forEach(m => { if (m.p2 === 'BYE') m.winner = m.p1; });
+  _tournament.currentRound++;
+  _tournament.rounds.push({ matches: nextMatches });
+  saveTournament(_tournament);
+
+  const nextReal = nextMatches.find(m => !m.winner);
+  if (nextReal) {
+    setTimeout(playTournamentMatch, 800);
+  } else {
+    advanceTournamentRound();
+  }
+}
+
+function resetTournament() {
+  _tournament = null;
+  try { localStorage.removeItem(TOURN_KEY); } catch(e) {}
+  renderTournamentUI();
+}
+
+// Hook tournament into showWinModal
+const _origShowWinModal = showWinModal;
+// Patch checkWin to also handle tournament
+const _origCheckWin2 = checkWin;
+function checkWin(playerId) {
+  const result = _origCheckWin2(playerId);
+  if (result && G?._tournamentMatch) {
+    const isPlayerWin = playerId === MY_ID;
+    setTimeout(() => onTournamentMatchWin(isPlayerWin), 500);
+  }
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DAILY LOGIN BONUS
+// ═══════════════════════════════════════════════════════════════
+function checkDailyBonus() {
+  try {
+    const last = parseInt(localStorage.getItem(DAILY_KEY) || '0', 10);
+    const now  = Date.now();
+    const dayMs = 86400000;
+    if (now - last < dayMs) return; // already claimed today
+    localStorage.setItem(DAILY_KEY, String(now));
+    const bonus = 10;
+    addShards(bonus, 'Daily Bonus!');
+    // Show bonus pop
+    const anchor = document.getElementById('daily-bonus-anchor');
+    if (!anchor) return;
+    const pop = document.createElement('div');
+    pop.className = 'daily-bonus-pop';
+    pop.innerHTML = `
+      <div class="daily-bonus-icon">🎁</div>
+      <div class="daily-bonus-text">
+        <div class="daily-bonus-title">Daily Bonus! +${bonus} 💎</div>
+        <div class="daily-bonus-sub">Come back tomorrow for another reward</div>
+      </div>
+      <button class="daily-bonus-close" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+    `;
+    document.body.appendChild(pop);
+    setTimeout(() => pop.remove(), 6000);
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHOP AFFORDABILITY NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
+let _lastNotifiedItem = null;
+function checkShopAffordability() {
+  const shards = getShards();
+  const data = getShopData();
+  const allItems = [...SHOP_ITEMS.cardBacks, ...SHOP_ITEMS.perks];
+  for (const item of allItems) {
+    if (item.price === 0) continue;
+    if (data[item.id] && !item.consumable) continue; // already owned
+    if (shards >= item.price && _lastNotifiedItem !== item.id) {
+      _lastNotifiedItem = item.id;
+      setTimeout(() => {
+        showToast(`💎 You can now afford "${item.name}" ${item.icon}`, 'fa-shopping-cart', 4000);
+      }, 800);
+      break; // only notify one at a time
+    }
+  }
+}
+
+// Also wire invite listener onto refreshLobbyBrowser
+const _origRefreshLobbyBrowser = refreshLobbyBrowser;
+async function refreshLobbyBrowser() {
+  await _origRefreshLobbyBrowser();
+  wireInviteListener();
+}
+
+// ═══════════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════════
 (async function boot() {
@@ -4757,14 +5893,17 @@ serve(async (req) => {
   if (existingUser) {
     updateDiscordProfileUI(existingUser);
     if (!MY_NAME) MY_NAME = existingUser.username.split('#')[0];
-    // Background sync shards/inventory
     syncUserWithSupabase(existingUser).catch(()=>{});
   }
+  // Daily bonus
+  setTimeout(checkDailyBonus, 2000);
   // Init live stats
   updateLiveStats();
   setInterval(updateLiveStats, 12000);
   // Shard HUD
   updateShardHUD();
+  // Check shop affordability on load
+  setTimeout(checkShopAffordability, 3000);
   // Start card floaters
   setTimeout(startCardFloaters, 1500);
 })();
