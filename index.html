@@ -4227,9 +4227,14 @@ async function tryInitDiscordSdk() {
     discordSdk = new DiscordSDK(CFG.DISCORD_CLIENT_ID);
     await discordSdk.ready();
     const { code } = await discordSdk.commands.authorize({
-      client_id: CFG.DISCORD_CLIENT_ID, response_type:'code', state:'', prompt:'none',
-      scope:['identify','guilds.members.read'],
+      client_id: CFG.DISCORD_CLIENT_ID,
+      response_type: 'code',
+      state: crypto.randomUUID(),
+      prompt: 'none',
+      scope: ['identify', 'guilds.members.read'],
     });
+    // Exchange the code immediately — no redirects, no popups, no copy-paste
+    if (code) await _exchangeOAuthCode(code);
     return discordSdk;
   } catch(e) { console.log('Discord SDK not available', e?.message||e); return null; }
 }
@@ -4876,17 +4881,19 @@ function startDiscordOAuth() {
   const oauthUrl = `https://discord.com/api/oauth2/authorize?${params}`;
 
   // ── Path 1: Discord Embedded App SDK (running inside a Discord Activity) ──
-  // Discord Activities can't open external URLs in popups or do redirects.
-  // The SDK's openExternalLink lets the user auth in their native browser and
-  // then copy the code back — we show a code-paste UI for this flow.
+  // Auth is handled at boot inside tryInitDiscordSdk() via discordSdk.commands.authorize().
+  // The SDK flow keeps everything inside the iframe — no redirects, no popups, no copy-paste.
+  // If the user reaches this button while the SDK is active, re-run the SDK flow.
   if (discordSdk) {
-    try {
-      discordSdk.commands.openExternalLink({ url: oauthUrl });
-      _showManualCodeEntry();
-      return;
-    } catch(e) {
-      // SDK call failed, fall through
+    const existingUser = getDiscordUser();
+    if (existingUser) {
+      showToast(`Already signed in as ${existingUser.username} ✓`, 'fa-check-circle', 3000);
+    } else {
+      // Re-run the SDK authorize + exchange in case boot auth failed or user logged out
+      showToast('Signing in via Discord…', 'fa-spinner', 2000);
+      tryInitDiscordSdk().catch(() => showToast('Sign-in failed — try again', 'fa-times-circle'));
     }
+    return;
   }
 
   // ── Path 2: Popup (normal browser outside Discord) ──
