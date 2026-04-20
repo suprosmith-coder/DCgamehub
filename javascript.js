@@ -411,8 +411,8 @@ async function setupChannel(code) {
   });
   CH.on('broadcast', { event: 'game_state' }, ({ payload }) => { if(isHost) return; applyStateUpdate(payload); });
   CH.on('broadcast', { event: 'game_action' }, ({ payload }) => { if(!isHost) return; processAction(payload); });
-  CH.on('broadcast', { event: 'tod_action' }, ({ payload }) => { applyTodAction(payload); });
   CH.on('broadcast', { event: 'chat_msg' }, ({ payload }) => { receiveChatMessage(payload); });
+  CH.on('broadcast', { event: 'card_reaction' }, ({ payload }) => { receiveReaction(payload); });
   CH.on('broadcast', { event: 'command_announce' }, ({ payload }) => {
     showToast(`🃏 ${payload.playerName} commanded: ${payload.commandText}`, 'fa-bolt', 6000);
     showCardEffect('command', 'COMMAND!');
@@ -459,9 +459,7 @@ let _lobbyBrowserData = {}; // roomCode -> { players, started, gameType, host }
 
 function openLobbyBrowser(type) {
   gameType = type;
-  document.getElementById('browser-title').innerHTML = type === 'uno'
-    ? '<i class="fas fa-layer-group"></i> UNO Lobbies'
-    : '<i class="fas fa-bullseye"></i> ToD Lobbies';
+  document.getElementById('browser-title').innerHTML = '<i class="fas fa-layer-group"></i> UNO Lobbies';
   document.getElementById('browser-inp-name').value = MY_NAME || '';
   document.getElementById('browser-confirm-name').disabled = !MY_NAME;
   document.getElementById('browser-name-box').style.display = MY_NAME ? 'none' : '';
@@ -600,8 +598,7 @@ function announceLobby() {
 // ═══════════════════════════════════════════════════════════════
 function openLobby(type) {
   gameType = type;
-  const icon = type === 'uno' ? '<i class="fas fa-layer-group"></i>' : '<i class="fas fa-bullseye"></i>';
-  document.getElementById('lobby-title').innerHTML = `${icon} ${type === 'uno' ? 'UNO Lobby' : 'ToD Lobby'}`;
+  document.getElementById('lobby-title').innerHTML = '<i class="fas fa-layer-group"></i> UNO Lobby';
   if (MY_NAME) {
     openLobbyBrowser(type);
   } else {
@@ -656,6 +653,11 @@ async function enterWaitingRoom(asSpectator=false) {
 }
 
 async function _enterRoom() {
+  // Save room for reconnect
+  try {
+    sessionStorage.setItem('nixai_last_room', roomCode);
+    sessionStorage.setItem('nixai_last_name', MY_NAME);
+  } catch(e) {}
   showScreen('screen-lobby');
   document.getElementById('lobby-room-box').style.display = 'none';
   document.getElementById('lobby-waiting-box').style.display = '';
@@ -719,29 +721,6 @@ function startAiGame() {
   });
 }
 
-function startAiTod() {
-  const BG = ['#818cf8','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
-  lobbyPlayers = {};
-  lobbyPlayers[MY_ID] = { id:MY_ID, name:MY_NAME, isHost:true };
-  // Add 3 AI "players" as named participants for context-rich prompts
-  const todAiNames = ['Alex','Jordan','Sam'];
-  todAiNames.forEach((name, i) => {
-    const aiId = AI_ID_PREFIX + i;
-    lobbyPlayers[aiId] = { id:aiId, name, isHost:false, isAi:true };
-  });
-  todAiMode = true;
-  initTodWithPlayers();
-  showScreen('screen-tod');
-  // Show AI mode badge in topbar
-  const topbarTitle = document.querySelector('#screen-tod .topbar-title');
-  if (topbarTitle && !document.getElementById('tod-ai-badge')) {
-    const badge = document.createElement('span');
-    badge.id = 'tod-ai-badge';
-    badge.style.cssText = 'background:rgba(129,140,248,.2);border:1px solid rgba(129,140,248,.35);border-radius:8px;padding:2px 8px;font-size:10px;color:var(--ai-color);font-family:\'Nunito\',sans-serif;font-weight:800;margin-left:4px;';
-    badge.innerHTML = '<i class="fas fa-robot" style="font-size:8px;"></i> AI';
-    topbarTitle.appendChild(badge);
-  }
-}
 
 function updateLobbyUI() {
   const list = document.getElementById('lobby-player-list');
@@ -778,12 +757,6 @@ function updateLobbyBrowser() {
 
 async function startGame() {
   if (!isHost) return;
-  if (gameType === 'tod') {
-    initTodWithPlayers();
-    showScreen('screen-tod');
-    broadcast('tod_action', { type:'start_tod' });
-    return;
-  }
   const playerIds = Object.keys(lobbyPlayers).filter(id => !lobbyPlayers[id]?.isSpectator);
   if (playerIds.length < 2 && SB) { showToast('Need at least 2 players to start','fa-exclamation-triangle'); return; }
   initGameState(playerIds);
@@ -943,23 +916,100 @@ function runDealAnimation(onComplete) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// RECONNECT ON DISCONNECT
+// ═══════════════════════════════════════════════════════════════
+const RECONNECT_HOLD_MS = 30000; // hold slot for 30s
+let _reconnectTimer = null;
+let _disconnectedPlayers = {}; // id -> { name, timer, heldAt }
+
+function watchForDisconnects() {
+  if (!META_CH || !isHost) return;
+  META_CH.on('presence', { event: 'leave' }, ({ leftPresences }) => {
+    leftPresences.forEach(p => {
+      const id = p.id || p.user_id;
+      if (!id || !G || !G.players[id] || isAiId(id) || id === MY_ID) return;
+      const name = G.players[id]?.name || id;
+      _disconnectedPlayers[id] = { name, heldAt: Date.now() };
+      showToast(`⚠️ ${name} disconnected — holding spot 30s`, 'fa-wifi', 5000);
+      addLog(`${name} disconnected — waiting for rejoin…`, 'log-warn');
+      renderLog();
+      // If it's their turn, pause timer
+      if (G.turnOrder[G.currentTurnIdx] === id) {
+        stopTurnTimer();
+        addLog(`Turn paused — ${name} dropped`, 'log-timer');
+      }
+      // Auto-remove after 30s
+      _reconnectTimer = setTimeout(() => {
+        if (_disconnectedPlayers[id]) {
+          delete _disconnectedPlayers[id];
+          // Remove from game if still gone
+          if (G && G.players[id]) {
+            addLog(`${name} did not reconnect — removed from game`, 'log-warn');
+            renderLog();
+            // Advance turn if it was theirs
+            if (G.turnOrder[G.currentTurnIdx] === id) {
+              advanceTurn(1);
+              _afterTurnSetup();
+              broadcastFullState();
+            }
+          }
+        }
+      }, RECONNECT_HOLD_MS);
+    });
+  });
+
+  META_CH.on('presence', { event: 'join' }, ({ newPresences }) => {
+    newPresences.forEach(p => {
+      const id = p.id || p.user_id;
+      if (!id || !_disconnectedPlayers[id]) return;
+      const name = _disconnectedPlayers[id].name;
+      delete _disconnectedPlayers[id];
+      clearTimeout(_reconnectTimer);
+      showToast(`✅ ${name} reconnected!`, 'fa-wifi', 3000);
+      addLog(`${name} reconnected!`, 'log-system');
+      renderLog();
+      // Send them the full current state
+      setTimeout(() => broadcastFullState(), 500);
+    });
+  });
+}
+
+async function attemptRejoin(code) {
+  // Called on boot if we have a saved roomCode and game was in progress
+  const savedCode = sessionStorage.getItem('nixai_last_room');
+  const savedName = sessionStorage.getItem('nixai_last_name');
+  if (!savedCode || !savedName) return false;
+  MY_NAME = savedName;
+  roomCode = savedCode;
+  isHost = false;
+  try {
+    await setupChannel(savedCode);
+    showToast('Reconnecting to game…', 'fa-spinner', 3000);
+    showScreen('screen-uno');
+    return true;
+  } catch(e) {
+    sessionStorage.removeItem('nixai_last_room');
+    return false;
+  }
+}
+
 function leaveLobby() {
   stopTurnTimer();
   clearTimeout(_aiThinkTimeout);
+  try { sessionStorage.removeItem('nixai_last_room'); } catch(e) {}
+  _disconnectedPlayers = {};
   if (CH) { SB?.removeChannel(CH); CH = null; }
   if (META_CH) { try { META_CH.untrack(); SB?.removeChannel(META_CH); } catch(e){} META_CH = null; }
   roomCode = '';
   isHost = false;
   isAiMode = false;
   isSpectator = false;
-  todAiMode = false;
   G = null;
   selectedIndices = [];
   stopMusic();
   document.getElementById('ai-mode-badge').style.display = 'none';
   document.getElementById('spectator-badge').style.display = 'none';
-  const todBadge = document.getElementById('tod-ai-badge');
-  if (todBadge) todBadge.remove();
   showScreen('screen-launcher');
 }
 function confirmLeaveGame() {
@@ -1063,6 +1113,23 @@ function processAction({ type, playerId, cards, card, chosenColor, swapTargetId 
   } else if (type === 'draw_card') {
     if (!G.deck.length) reshuffleDeck();
     const drawn = G.deck.splice(0, Math.max(1, G.drawStack));
+    // pk_lucky: guarantee first drawn card is playable (only on single draws, not penalty draws)
+    if (playerId === MY_ID && G.drawStack === 0 && drawn.length === 1) {
+      const shopData = getShopData();
+      if (shopData['pk_lucky'] > 0 && !G._luckyUsedThisGame) {
+        const playableIdx = G.deck.findIndex(c => isPlayable(c));
+        if (playableIdx !== -1) {
+          G.deck.unshift(drawn[0]);           // put drawn back
+          const lucky = G.deck.splice(playableIdx + 1, 1)[0]; // pull playable
+          drawn[0] = lucky;
+          G._luckyUsedThisGame = true;
+          shopData['pk_lucky']--;
+          if (shopData['pk_lucky'] <= 0) delete shopData['pk_lucky'];
+          saveShopData(shopData);
+          showToast('🍀 Lucky Draw! Got a playable card!', 'fa-clover', 2500);
+        }
+      }
+    }
     G.hands[playerId] = [...(G.hands[playerId]||[]), ...drawn];
     G.players[playerId].cardCount = G.hands[playerId].length;
     if (G.drawStack > 0) {
@@ -1531,6 +1598,15 @@ function playSelected() {
 function executePlay(cards, chosenColor, swapTargetId=null, commandText=null) {
   clearTimeout(_aiThinkTimeout);
   stopTurnTimer();
+  // pk_undo: snapshot state before playing so we can roll back
+  const shopData = getShopData();
+  if (shopData['pk_undo'] > 0 && !G._undoUsedThisGame) {
+    G._undoSnapshot = {
+      hand: [...G.myHand],
+      topCard: G.topCard ? {...G.topCard} : null,
+      topColor: G.topColor,
+    };
+  }
   const indices = [...selectedIndices].sort((a,b)=>b-a);
   for (const i of indices) G.myHand.splice(i,1);
   if (G.hands[MY_ID]) G.hands[MY_ID] = [...G.myHand];
@@ -1555,6 +1631,34 @@ function executePlay(cards, chosenColor, swapTargetId=null, commandText=null) {
   if (cards.length >= 3) setTimeout(() => showCombo(cards.length), 300);
   if (isHost) processAction(payload);
   else { broadcast('game_action', payload); renderGame(); _afterTurnSetup(); }
+}
+
+// ── pk_undo: Roll back the last card play ──
+function undoLastPlay() {
+  const shopData = getShopData();
+  if (!G || !G._undoSnapshot || G._undoUsedThisGame || !(shopData['pk_undo'] > 0)) {
+    showToast('Undo not available', 'fa-times-circle');
+    return;
+  }
+  G.myHand = [...G._undoSnapshot.hand];
+  G.hands[MY_ID] = [...G.myHand];
+  G.topCard = G._undoSnapshot.topCard;
+  G.topColor = G._undoSnapshot.topColor;
+  G._undoSnapshot = null;
+  G._undoUsedThisGame = true;
+  shopData['pk_undo']--;
+  if (shopData['pk_undo'] <= 0) delete shopData['pk_undo'];
+  saveShopData(shopData);
+  // Rewind turn back to player
+  const myIdx = G.turnOrder.indexOf(MY_ID);
+  G.currentTurnIdx = myIdx;
+  selectedIndices = [];
+  stopTurnTimer();
+  renderGame();
+  _afterTurnSetup();
+  showToast('↩️ Undo! Card taken back.', 'fa-undo', 2500);
+  if (isHost) broadcastFullState();
+  else broadcast('game_state', getSerializableState());
 }
 
 function drawCardAction() {
@@ -1635,7 +1739,24 @@ function closeWinModal() {
 // ═══════════════════════════════════════════════════════════════
 // IN-GAME CHAT
 // ═══════════════════════════════════════════════════════════════
+function initReactionSystem() {
+  // Wire discard pile area for reactions
+  const arena = document.getElementById('game-arena');
+  if (arena && !arena.dataset.reactionWired) {
+    arena.dataset.reactionWired = '1';
+    arena.addEventListener('click', (e) => {
+      if (!G || !G.started || isSpectator) return;
+      // only trigger if clicking discard area (not a card in hand)
+      const discardEl = document.getElementById('discard-pile');
+      if (discardEl && discardEl.contains(e.target)) {
+        showReactionPicker();
+      }
+    });
+  }
+}
+
 function initChatPanel() {
+  initReactionSystem();
   chatUnreadCount = 0;
   document.getElementById('chat-messages').innerHTML = '';
   addChatMessage(null, 'Game started! Good luck 🎮', true);
@@ -1854,10 +1975,52 @@ function renderTurnState() {
 
   if (isSpectator) {
     ind.style.display = 'none';
-    spectatorEl.style.display = '';
     document.getElementById('hand-cards').style.display = 'none';
     document.getElementById('action-bar')?.classList.add('hidden');
+    // Live spectator view — show all players' face-up hands
+    const specEl = document.getElementById('spectator-indicator');
+    if (specEl) {
+      const watching = G.turnOrder.find(id => !isAiId(id) && id !== MY_ID);
+      const curName = currentTurnName();
+      let handsHtml = '';
+      G.turnOrder.forEach(id => {
+        if (isAiId(id)) return;
+        const p = G.players[id];
+        const hand = G.hands[id] || [];
+        const isActive = G.turnOrder[G.currentTurnIdx] === id;
+        handsHtml += `<div style="margin-bottom:8px;">
+          <div style="font-size:10px;font-weight:800;color:${isActive?'var(--uno-yellow)':'var(--muted)'};margin-bottom:4px;display:flex;align-items:center;gap:5px;">
+            ${isActive?'<i class="fas fa-bolt" style="font-size:8px;"></i>':''} ${p?.name||id} — ${hand.length} card${hand.length!==1?'s':''}
+          </div>
+          <div style="display:flex;gap:3px;flex-wrap:wrap;">
+            ${hand.slice(0,10).map(c => {
+              const bgMap = {red:'#e8302c',blue:'#1a73e8',yellow:'#f9c023',green:'#2db552',black:'#222'};
+              const bg = bgMap[c.color] || '#333';
+              const label = c.value==='wild4'?'+4':c.value==='wild'?'W':c.value==='draw2'?'+2':c.value==='skip'?'⊘':c.value==='reverse'?'↺':c.value;
+              return `<div style="width:20px;height:30px;background:${bg};border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;border:1px solid rgba(255,255,255,.2);">${label}</div>`;
+            }).join('')}
+            ${hand.length>10?`<div style="font-size:9px;color:var(--muted);align-self:center;">+${hand.length-10}</div>`:''}
+          </div>
+        </div>`;
+      });
+      specEl.innerHTML = `
+        <div style="width:100%;text-align:left;">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+            <i class="fas fa-eye"></i>
+            <span style="font-size:12px;font-weight:800;">Spectating · <span style="color:var(--uno-yellow)">${curName}'s turn</span></span>
+          </div>
+          ${handsHtml || '<div style="color:var(--muted);font-size:11px;">Waiting for game…</div>'}
+        </div>`;
+      specEl.style.display = '';
+    }
     return;
+  }
+
+  // Show undo button if perk owned and snapshot available
+  const undoBtn = document.getElementById('undo-btn');
+  if (undoBtn) {
+    const sd = getShopData();
+    undoBtn.style.display = (sd['pk_undo'] > 0 && G._undoSnapshot && !G._undoUsedThisGame) ? '' : 'none';
   }
 
   if (isMyTurn()) {
@@ -1889,6 +2052,40 @@ function updateDrawStackBadge() {
 }
 
 function updatePlayerChips() { if(G&&G.started) renderPlayers(); }
+
+// ── WIN EFFECTS ──
+function triggerBasicWinFx() {
+  spawnWinParticles(40, false);
+}
+function triggerWinFx() {
+  spawnWinParticles(120, true);
+  // lightning flash
+  const flash = document.createElement('div');
+  flash.style.cssText = 'position:fixed;inset:0;z-index:9999;pointer-events:none;background:rgba(255,255,255,0.7);animation:winFlash .4s ease forwards;';
+  document.body.appendChild(flash);
+  setTimeout(() => flash.remove(), 500);
+}
+function spawnWinParticles(count, premium) {
+  const colors = premium
+    ? ['#f9c023','#5865F2','#22c55e','#ef4444','#a78bfa','#fff','#00d4ff']
+    : ['#f9c023','#5865F2','#22c55e'];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    const x = Math.random() * 100;
+    const size = Math.random() * 10 + 6;
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const dur = Math.random() * 1.5 + 1;
+    const delay = Math.random() * 0.6;
+    const rot = Math.random() * 720 - 360;
+    p.style.cssText = `position:fixed;top:-20px;left:${x}vw;width:${size}px;height:${size}px;
+      background:${color};border-radius:${Math.random()>.5?'50%':'2px'};
+      z-index:9998;pointer-events:none;opacity:1;
+      animation:confettiFall ${dur}s ${delay}s ease-in forwards;
+      transform:rotate(${rot}deg);`;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), (dur + delay + 0.1) * 1000);
+  }
+}
 
 function showWinModal(winnerId) {
   const p = G.players[winnerId];
@@ -1945,6 +2142,15 @@ function showWinModal(winnerId) {
   if (rematchBtn) rematchBtn.style.display = (isHost && isAiMode) ? '' : 'none';
 
   document.getElementById('win-modal').classList.add('show');
+  // pk_winfx: confetti + lightning burst on win
+  if (isMe) {
+    const shopData = getShopData();
+    if (shopData['pk_winfx']) {
+      setTimeout(triggerWinFx, 200);
+    } else {
+      setTimeout(triggerBasicWinFx, 200);
+    }
+  }
   // Check if new shop items are now affordable
   setTimeout(checkShopAffordability, 1200);
 
@@ -1962,17 +2168,62 @@ function showWinModal(winnerId) {
       progressChallenge('gamesPlayed', 1);
       if (selectedDifficulty === 'hard') progressChallenge('hardAiWin', 1);
       if (G._noDrawThisGame) progressChallenge('noDrawWin', 1);
-      // XP display in win modal
+      // XP breakdown modal — animated line-by-line reveal
       setTimeout(() => {
-        const existing = document.querySelector('.xp-earned-display');
+        const existing = document.querySelector('.xp-breakdown-wrap');
         if (existing) existing.remove();
-        const xpDiv = document.createElement('div');
-        xpDiv.className = 'xp-earned-display';
-        xpDiv.style.cssText = 'background:rgba(129,140,248,.1);border:1px solid rgba(129,140,248,.25);border-radius:12px;padding:8px 16px;margin:6px 0;font-family:"Fredoka One",cursive;font-size:16px;color:#a5b4fc;text-align:center;';
-        xpDiv.innerHTML = `⬆️ +${baseXP+streakBonus} XP &nbsp;·&nbsp; Lv.${getLevelFromXP(getTotalXP())}`;
+        const totalXP = getTotalXP();
+        const lvl = getLevelFromXP(totalXP);
+        const nextLvlXP = getXPForNextLevel(lvl);
+        const progress = lvl >= 20 ? 1 : (totalXP - XP_PER_LEVEL[lvl]) / (nextLvlXP - XP_PER_LEVEL[lvl]);
+        const lines = [
+          { label: isAiMode ? '🤖 AI Win' : '🏆 Multiplayer Win', xp: baseXP },
+          ...(streakBonus > 0 ? [{ label: `🔥 ${Math.min(streak,5)}× Win Streak`, xp: streakBonus }] : []),
+          ...(getShopData()['pk_xpboost'] !== undefined ? [] : []),
+        ];
+        const total = lines.reduce((s, l) => s + l.xp, 0);
+        const wrap = document.createElement('div');
+        wrap.className = 'xp-breakdown-wrap';
+        wrap.style.cssText = 'background:rgba(129,140,248,.08);border:1px solid rgba(129,140,248,.2);border-radius:14px;padding:12px 16px;margin:8px 0;overflow:hidden;';
+        wrap.innerHTML = `
+          <div style="font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:5px;">
+            <i class="fas fa-star" style="color:#a5b4fc;font-size:9px;"></i> XP Earned
+          </div>
+          <div class="xp-lines"></div>
+          <div style="height:1px;background:rgba(255,255,255,.06);margin:8px 0;"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-family:'Fredoka One',cursive;">
+            <span style="font-size:14px;color:#fff;">Total</span>
+            <span class="xp-total-num" style="font-size:18px;color:#a5b4fc;">+0 XP</span>
+          </div>
+          <div style="margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:800;color:var(--muted);margin-bottom:4px;">
+              <span>Level ${lvl}</span><span>${lvl >= 20 ? 'MAX' : 'Level ' + (lvl+1)}</span>
+            </div>
+            <div style="height:6px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;">
+              <div class="xp-bar-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#818cf8,#a5b4fc);border-radius:6px;transition:width 1s ease;"></div>
+            </div>
+          </div>`;
         const shardDiv = document.getElementById('win-shards-earned');
-        if (shardDiv) shardDiv.after(xpDiv);
-      }, 100);
+        if (shardDiv) shardDiv.after(wrap);
+        // Animate lines in one by one
+        const linesEl = wrap.querySelector('.xp-lines');
+        const totalEl = wrap.querySelector('.xp-total-num');
+        const barEl = wrap.querySelector('.xp-bar-fill');
+        let runningTotal = 0;
+        lines.forEach((line, i) => {
+          setTimeout(() => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;margin-bottom:4px;animation:xpLineIn .3s ease both;';
+            row.innerHTML = `<span style="color:#d1d5db;">${line.label}</span><span style="color:#a5b4fc;">+${line.xp}</span>`;
+            linesEl.appendChild(row);
+            runningTotal += line.xp;
+            totalEl.textContent = `+${runningTotal} XP`;
+          }, i * 280);
+        });
+        setTimeout(() => {
+          barEl.style.width = `${Math.min(progress * 100, 100)}%`;
+        }, lines.length * 280 + 100);
+      }, 300);
     } else {
       awardXP(10, 'Participation');
       progressChallenge('gamesPlayed', 1);
@@ -1980,268 +2231,74 @@ function showWinModal(winnerId) {
   } catch(e) { console.warn('Progression error:', e); }
 }
 
+
 // ═══════════════════════════════════════════════════════════════
-// TRUTH OR DARE
+// CARD EMOJI REACTIONS
 // ═══════════════════════════════════════════════════════════════
-const TRUTHS = [
-  "What's the most embarrassing thing you've texted to the wrong person?",
-  "Have you ever lied to get out of plans with a friend?",
-  "What's your most irrational fear?",
-  "Have you ever pretended to be sick to skip school or work?",
-  "What's the pettiest thing you've ever done to get revenge?",
-  "What's something you've done that you'd be mortified if your parents found out?",
-  "Have you ever stalked an ex on social media? How recently?",
-  "What's the most childish thing you still do?",
-  "What's a secret you've never told anyone in this call?",
-  "What's the most trouble you've ever been in?",
-  "Have you ever ghosted someone you actually liked?",
-  "What's the biggest lie you've told and gotten away with?",
-  "What's a habit you have that you'd never admit in person?",
-  "Who here would you most want to swap lives with for a week?",
-  "What's the most cringe thing on your phone right now?",
-  "Have you ever pretended to not see someone in public to avoid them?",
-  "What's the most embarrassing thing you've done on social media?",
-  "What song do you know all the words to but would never admit?",
-  "What's the most money you've ever spent on something you regret?",
-  "Have you ever told a secret you promised to keep?",
-];
-const DARES = [
-  "Send a compliment to the 3rd person in your contact list — right now.",
-  "Speak in an accent for the next 2 rounds.",
-  "Share the last song you listened to.",
-  "Type your next 3 messages with your eyes closed.",
-  "Change your server nickname to something embarrassing for 10 minutes.",
-  "Write a 2-sentence love poem about the player to your left.",
-  "Do your best impression of another player until they guess who you are.",
-  "Send your most recent camera roll photo to the group.",
-  "Tell everyone your most recent search history item.",
-  "Sing the chorus of the last song stuck in your head.",
-  "Send a voice message of you making animal sounds for 10 seconds.",
-  "Read the last message you sent in your most recent chat, out loud.",
-  "Do 10 jumping jacks on camera right now.",
-  "Send a dramatic monologue about losing your favorite snack.",
-  "Describe your fashion sense in exactly 3 words.",
-];
-const WILDS = [
-  "Everyone must whisper everything they say for the next 2 rounds.",
-  "The group votes: the player with the worst dare idea gets a penalty dare!",
-  "Everyone skips their next turn — the wildcard player goes twice.",
-  "Next player to laugh on camera draws 2 cards.",
-  "Everyone swaps their seats (or camera angles) for the next round.",
-  "The oldest player gets to create a custom truth for the current player.",
-  "Silent round — nobody can speak for 60 seconds!",
-  "Speed round: every player must share one embarrassing fact in 30 seconds.",
-];
+const REACTIONS = ['🔥','😭','💀','👀','🤣','😤','🫡','💎','🤯','👏'];
+let _reactionCooldown = false;
 
-const todState = { players:[], currentIdx:0, round:1, spun:false };
-let todAiMode = false;
-const todPromptHistory = []; // tracks recent prompts to avoid repetition
-
-function initTodWithPlayers() {
-  const BG=['#818cf8','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
-  const ids = Object.keys(lobbyPlayers);
-  todState.players = ids.map((id,i) => ({
-    id, name:lobbyPlayers[id]?.name||`P${i+1}`,
-    color:BG[i%BG.length], score:0, spotlight:i===0,
-  }));
-  todState.currentIdx = 0;
-  todState.round = 1;
-  todState.spun = false;
-  renderTod();
-}
-
-function renderTod() {
-  const container = document.getElementById('tod-players');
-  container.innerHTML = '';
-  todState.players.forEach(p => {
-    const chip = document.createElement('div');
-    chip.className = `tod-player-chip${p.spotlight?' spotlight':''}`;
-    chip.innerHTML = `
-      <div class="tod-avatar" style="background:${p.color}">${p.name.slice(0,1).toUpperCase()}</div>
-      <div class="tod-pname">${p.name}</div>
-      <div class="tod-pscore"><i class="fas fa-star" style="color:var(--uno-yellow);font-size:8px;"></i> ${p.score}</div>
-      ${p.spotlight?'<i class="fas fa-bullseye" style="position:absolute;top:-13px;color:var(--tod-pink);font-size:13px;animation:bounce 1s ease infinite;"></i>':''}
-    `;
-    container.appendChild(chip);
+function showReactionPicker() {
+  if (!G || !G.started) return;
+  const existing = document.getElementById('reaction-picker');
+  if (existing) { existing.remove(); return; }
+  const picker = document.createElement('div');
+  picker.id = 'reaction-picker';
+  picker.style.cssText = `
+    position:fixed;bottom:180px;left:50%;transform:translateX(-50%);
+    background:rgba(13,15,26,.95);border:1px solid rgba(255,255,255,.12);
+    border-radius:16px;padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap;
+    justify-content:center;z-index:200;backdrop-filter:blur(20px);
+    box-shadow:0 8px 32px rgba(0,0,0,.6);animation:fadeUp .2s ease both;
+    max-width:260px;`;
+  REACTIONS.forEach(emoji => {
+    const btn = document.createElement('button');
+    btn.textContent = emoji;
+    btn.style.cssText = 'background:none;border:none;font-size:22px;cursor:pointer;padding:4px;border-radius:8px;transition:transform .15s;';
+    btn.onmouseenter = () => { btn.style.transform = 'scale(1.3)'; };
+    btn.onmouseleave = () => { btn.style.transform = 'scale(1)'; };
+    btn.onclick = () => { sendReaction(emoji); picker.remove(); };
+    picker.appendChild(btn);
   });
-  document.getElementById('tod-round').textContent = todState.round;
-  document.getElementById('tod-choice-btns').style.display = 'none';
-  document.getElementById('tod-prompt-area').innerHTML = '';
-  const icon = document.getElementById('wheel-icon');
-  if (icon) icon.className = 'fas fa-bullseye';
-  document.getElementById('wheel-label').textContent = 'Spin!';
-  todState.spun = false;
-  renderTodScoreboard();
+  document.body.appendChild(picker);
+  // Auto-close after 4s
+  setTimeout(() => picker?.remove(), 4000);
 }
 
-function renderTodScoreboard() {
-  const area = document.getElementById('tod-scoreboard-area');
-  if (!area) return;
-  const sorted = [...todState.players].sort((a,b)=>b.score-a.score);
-  area.innerHTML = `
-    <div class="tod-scoreboard">
-      <div class="tod-scoreboard-title"><i class="fas fa-trophy"></i> Scoreboard</div>
-      ${sorted.map((p,i)=>`
-        <div class="score-row">
-          <span class="score-rank rank-${i+1}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
-          <span class="score-name">${p.name}</span>
-          <span class="score-pts">${p.score} pt${p.score!==1?'s':''}</span>
-        </div>
-      `).join('')}
-    </div>
-  `;
+function sendReaction(emoji) {
+  if (_reactionCooldown) return;
+  _reactionCooldown = true;
+  setTimeout(() => { _reactionCooldown = false; }, 1800);
+  const sender = G?.players[MY_ID]?.name || MY_NAME || '?';
+  spawnReaction(emoji, sender, true);
+  broadcast('card_reaction', { emoji, sender });
 }
 
-function spinWheel() {
-  if (todState.spun) return;
-  todState.spun = true;
-  const wheel = document.getElementById('tod-wheel');
-  wheel.classList.add('spinning');
-  playSound('play');
-  setTimeout(() => {
-    wheel.classList.remove('spinning');
-    const cur = todState.players[todState.currentIdx];
-    const icon = document.getElementById('wheel-icon');
-    if (icon) icon.className = 'fas fa-star';
-    document.getElementById('wheel-label').textContent = cur.name+'!';
-    document.getElementById('tod-choice-btns').style.display = 'flex';
-    showToast(`${cur.name}'s turn!`,'fa-bullseye');
-    if (SB) broadcast('tod_action',{type:'spin',playerName:cur.name});
-  }, 900);
+function spawnReaction(emoji, senderName, isMe) {
+  const el = document.createElement('div');
+  const x = 40 + Math.random() * 20; // near center
+  el.style.cssText = `
+    position:fixed;bottom:200px;left:${x}%;transform:translateX(-50%);
+    font-size:32px;z-index:500;pointer-events:none;
+    animation:reactionFloat 2s ease forwards;
+    filter:drop-shadow(0 2px 8px rgba(0,0,0,.5));`;
+  el.textContent = emoji;
+  // Name tag
+  const tag = document.createElement('div');
+  tag.style.cssText = `
+    font-size:10px;font-weight:800;color:#fff;text-align:center;
+    background:rgba(0,0,0,.6);border-radius:6px;padding:1px 6px;
+    margin-top:2px;white-space:nowrap;`;
+  tag.textContent = isMe ? 'You' : senderName;
+  el.appendChild(tag);
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2100);
 }
 
-function chooseTod(type) {
-  document.getElementById('tod-choice-btns').style.display = 'none';
-  const cur = todState.players[todState.currentIdx];
-  const useAi = todAiMode;
-  document.getElementById('tod-prompt-area').innerHTML = `
-    <div class="ai-thinking">
-      <i class="fas fa-${useAi ? 'robot' : 'dice'}" style="color:var(--accent2);"></i>
-      <span>${useAi ? 'AI is crafting your ' + type + '…' : 'Picking a ' + type + '…'}</span>
-      <div class="ai-thinking-dots"><span></span><span></span><span></span></div>
-    </div>`;
-  if (useAi) {
-    generateGroqPrompt(type, cur.name).then(prompt => showPrompt(type, prompt)).catch(() => {
-      // Fallback to static prompts on edge function error
-      showPrompt(type, null);
-    });
-  } else {
-    setTimeout(() => showPrompt(type, null), 1200);
-  }
+function receiveReaction(payload) {
+  if (!G || !G.started) return;
+  spawnReaction(payload.emoji, payload.sender, false);
 }
-
-async function generateGroqPrompt(type, playerName) {
-  // Groq API key lives in Supabase Edge Function env secrets — never in the frontend
-  const players = todState.players.map(p => p.name).join(', ');
-  const round = todState.round;
-  const recent = todPromptHistory.slice(-4).map(h => `"${h}"`).join(', ');
-  const res = await fetch(`${CFG.SUPABASE_URL}/functions/v1/groq-ai`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${CFG.SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({
-      task: 'tod_prompt',
-      type,
-      playerName,
-      players,
-      round,
-      recentPrompts: recent,
-    }),
-  });
-  if (!res.ok) throw new Error('Edge function error ' + res.status);
-  const data = await res.json();
-  const prompt = data.result?.trim();
-  if (!prompt) throw new Error('Empty response');
-  todPromptHistory.push(prompt);
-  if (todPromptHistory.length > 20) todPromptHistory.shift();
-  return prompt;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// GROQ UNO AI TAUNTS
-// ═══════════════════════════════════════════════════════════════
-const _groqTauntCache = {}; // prevent duplicate in-flight requests per AI
-async function generateGroqUnoTaunt(aiName, style, playedCard, handSize, chosenColor) {
-  // Calls Supabase Edge Function — Groq API key lives server-side only
-  if (_groqTauntCache[aiName]) return null; // already has one in flight
-  _groqTauntCache[aiName] = true;
-  try {
-    const cardDesc = playedCard.color === 'black'
-      ? `${playedCard.value === 'wild4' ? 'Wild +4' : 'Wild'} (chose ${chosenColor})`
-      : `${playedCard.color} ${VALUE_LABEL[playedCard.value] || playedCard.value}`;
-    const playerName = G?.players[MY_ID]?.name || 'the human';
-    const res = await fetch(`${CFG.SUPABASE_URL}/functions/v1/groq-ai`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${CFG.SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({
-        task: 'uno_taunt',
-        aiName,
-        style,
-        cardDesc,
-        handSize,
-        playerName,
-      }),
-    });
-    if (!res.ok) throw new Error('Edge function error ' + res.status);
-    const data = await res.json();
-    return data.result?.trim() || null;
-  } finally {
-    setTimeout(() => { delete _groqTauntCache[aiName]; }, 4000);
-  }
-}
-
-function showPrompt(type, aiPrompt) {
-  const arr = type==='truth'?TRUTHS:type==='dare'?DARES:WILDS;
-  const prompt = aiPrompt || arr[Math.floor(Math.random()*arr.length)];
-  const area = document.getElementById('tod-prompt-area');
-  const iconHtml = type==='truth'?'<i class="fas fa-comment"></i> Truth':type==='dare'?'<i class="fas fa-fire"></i> Dare':'<i class="fas fa-bolt"></i> Wild Card';
-  const aiTag = aiPrompt ? ' <span style="font-size:9px;background:rgba(129,140,248,.2);border:1px solid rgba(129,140,248,.3);border-radius:6px;padding:1px 6px;color:var(--ai-color);font-family:Nunito,sans-serif;font-weight:800;letter-spacing:.08em;vertical-align:middle;"><i class="fas fa-robot" style="font-size:7px;"></i> AI</span>' : '';
-  area.innerHTML = `
-    <div class="prompt-card ${type}-card card-play-anim">
-      <div class="prompt-type">${iconHtml}${aiTag}</div>
-      <div class="prompt-text">${prompt}</div>
-      <div class="prompt-actions">
-        <button class="prompt-action-btn btn-complete" id="tod-complete-btn">
-          <i class="fas fa-check"></i> Done!
-        </button>
-        <button class="prompt-action-btn btn-skip" id="tod-skip-btn">
-          <i class="fas fa-forward"></i> Skip (−1 pt)
-        </button>
-      </div>
-    </div>`;
-  document.getElementById('tod-complete-btn').addEventListener('click', completePrompt);
-  document.getElementById('tod-skip-btn').addEventListener('click', skipPrompt);
-}
-
-function completePrompt() {
-  const p = todState.players[todState.currentIdx];
-  p.score += 1;
-  showToast(`${p.name} completed it! +1`,'fa-check-circle');
-  playSound('play');
-  advanceTod();
-}
-function skipPrompt() {
-  const p = todState.players[todState.currentIdx];
-  p.score = Math.max(0,(p.score||0)-1);
-  showToast('Skipped! −1 pt','fa-forward');
-  advanceTod();
-}
-function advanceTod() {
-  todState.players.forEach(p=>p.spotlight=false);
-  todState.currentIdx = (todState.currentIdx+1)%todState.players.length;
-  if (todState.currentIdx===0) todState.round++;
-  todState.players[todState.currentIdx].spotlight=true;
-  setTimeout(()=>renderTod(),700);
-}
-function applyTodAction(payload) {
-  if (payload.type==='start_tod'&&!isHost) { initTodWithPlayers(); showScreen('screen-tod'); }
-}
-
 // ═══════════════════════════════════════════════════════════════
 // SCREEN MANAGER
 // ═══════════════════════════════════════════════════════════════
@@ -2357,9 +2414,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Launcher
   document.querySelectorAll('.activity-card.uno-card').forEach(el=>el.addEventListener('click',()=>openLobby('uno')));
-  document.querySelectorAll('.activity-card.tod-card').forEach(el=>el.addEventListener('click',()=>openLobby('tod')));
   document.querySelectorAll('.uno-card .launch-btn').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();openLobby('uno');}));
-  document.querySelectorAll('.tod-card .launch-btn').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();openLobby('tod');}));
 
   // Lobby browser
   wire('#browser-back-btn', ()=>showScreen('screen-launcher'));
@@ -2368,22 +2423,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Browser AI quick launch
   wire('#browser-play-ai-btn', () => {
-    const type = document.getElementById('ai-game-type-select').value;
-    gameType = type;
-    if (type === 'tod') {
-      startAiTod();
-    } else {
-      const count = parseInt(document.getElementById('browser-ai-count').value, 10) || 2;
-      document.getElementById('ai-count-select').value = String(count);
-      startAiGame();
-    }
-  });
-  document.getElementById('ai-game-type-select')?.addEventListener('change', () => {
-    const isTod = document.getElementById('ai-game-type-select').value === 'tod';
-    document.getElementById('ai-opponent-count-wrap').style.display = isTod ? 'none' : '';
-    document.getElementById('browser-play-ai-btn').innerHTML = isTod
-      ? '<i class="fas fa-bullseye"></i> Start Truth or Dare'
-      : '<i class="fas fa-robot"></i> Play vs AI';
+    const count = parseInt(document.getElementById('browser-ai-count').value, 10) || 2;
+    document.getElementById('ai-count-select').value = String(count);
+    startAiGame();
   });
   document.getElementById('browser-inp-name')?.addEventListener('input', () => {
     const v = document.getElementById('browser-inp-name').value.trim();
@@ -2437,7 +2479,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Back buttons in game
   wire('#uno-leave-btn', confirmLeaveGame);
-  wire('#tod-back-btn', ()=>{ if(confirm('Leave Truth or Dare?')) leaveLobby(); });
 
   // UNO buttons
   wire('#play-btn', playSelected);
@@ -2474,10 +2515,6 @@ document.addEventListener('DOMContentLoaded', () => {
   wire('#win-rematch-btn', doRematch);
 
   // ToD
-  wire('#tod-wheel', spinWheel);
-  document.querySelectorAll('.tod-truth-btn').forEach(b=>b.addEventListener('click',()=>chooseTod('truth')));
-  document.querySelectorAll('.tod-dare-btn').forEach(b=>b.addEventListener('click',()=>chooseTod('dare')));
-  document.querySelectorAll('.tod-wild-btn').forEach(b=>b.addEventListener('click',()=>chooseTod('wild')));
 
   // Chat
   wire('#chat-toggle', toggleChat);
@@ -4153,6 +4190,11 @@ async function refreshLobbyBrowser() {
       await handleOAuthCallback();
     }
   }
+  // Attempt rejoin if disconnected mid-game
+  const _savedRoom = sessionStorage.getItem('nixai_last_room');
+  if (_savedRoom && !discordSdk) { // only auto-rejoin in browser (Activity re-inits cleanly)
+    await attemptRejoin(_savedRoom).catch(() => {});
+  }
   // Restore Discord profile chip if already logged in
   const existingUser = getDiscordUser();
   if (existingUser) {
@@ -4209,6 +4251,14 @@ function getXPForNextLevel(level){return level>=MAX_LEVEL?XP_PER_LEVEL[MAX_LEVEL
 function getPlayerTitle(level){return TITLES_BY_LEVEL[Math.min(level,MAX_LEVEL)]||'UNO Master';}
 
 function awardXP(amount, reason) {
+  // pk_xpboost: double XP perk
+  const shopData = getShopData();
+  if (shopData['pk_xpboost'] > 0) {
+    amount = Math.round(amount * 2);
+    shopData['pk_xpboost']--;
+    if (shopData['pk_xpboost'] <= 0) delete shopData['pk_xpboost'];
+    saveShopData(shopData);
+  }
   const prev=getTotalXP(), prevLv=getLevelFromXP(prev), newXP=prev+amount;
   saveTotalXP(newXP);
   const newLv=getLevelFromXP(newXP);
