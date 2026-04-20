@@ -1,580 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Game Hub · Discord Activity</title>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script>
-/* MessageChannel polyfill — required for Supabase inside Discord Activity iframe */
-if (typeof MessageChannel === 'undefined') {
-  window.MessageChannel = class {
-    constructor() {
-      this.port1 = { postMessage(){}, onmessage:null };
-      this.port2 = { postMessage(){}, onmessage:null };
-    }
-  };
-}
-</script>
-</head>
-<body>
-<canvas id="bg-canvas"></canvas>
-<canvas id="card-preview-canvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity 1s;" id="card-preview-canvas"></canvas>
 
-<!-- Special card effect overlay -->
-<div class="effect-overlay" id="effect-overlay">
-  <span class="effect-text" id="effect-text"></span>
-</div>
-
-<!-- Shards HUD (top-right, visible in game screens) -->
-<div class="shard-hud" id="shard-hud" title="Your Shards" onclick="showShardInfo()">
-  <span class="shard-hud-icon">💎</span>
-  <span id="shard-count">0</span>
-</div>
-
-<!-- Discord Auth Modal -->
-<div class="auth-modal-overlay" id="auth-modal">
-  <div class="auth-box">
-    <div class="auth-box-icon">
-      <svg viewBox="0 0 24 24" fill="#5865F2" width="52" height="52"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.053a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.075.075 0 0 0-.041-.104 13.175 13.175 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-    </div>
-    <h3>Sign in with Discord</h3>
-    <p>Link your Discord account to sync shards, card backs, and perks across all your devices.</p>
-    <div class="auth-feature-list">
-      <div class="auth-feature"><i class="fas fa-gem"></i> Shards saved to your account</div>
-      <div class="auth-feature"><i class="fas fa-palette"></i> Card back skins persist everywhere</div>
-      <div class="auth-feature"><i class="fas fa-star"></i> Perks & shop items cloud-synced</div>
-      <div class="auth-feature"><i class="fas fa-user-circle"></i> Avatar shown in lobbies</div>
-    </div>
-    <div class="auth-loading" id="auth-loading">
-      <div class="auth-spinner"></div>
-      <span id="auth-loading-text">Connecting to Discord…</span>
-    </div>
-    <div id="auth-btn-area">
-      <button class="discord-login-btn" style="width:100%;justify-content:center;font-size:14px;padding:12px 20px;" onclick="startDiscordOAuth()">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.053a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.075.075 0 0 0-.041-.104 13.175 13.175 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-        Continue with Discord
-      </button>
-      <button class="btn btn-secondary" style="width:100%;margin-top:10px;font-size:12px;" onclick="document.getElementById('auth-modal').classList.remove('show')">
-        Play as Guest
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- LAUNCHER -->
-<div id="screen-launcher" class="screen active">
-  <div class="launcher-header">
-    <!-- NixAi Brand Bar -->
-    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px;">
-      <div style="background:linear-gradient(135deg,#5865F2,#818cf8);width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive;font-size:14px;color:#fff;box-shadow:0 4px 12px rgba(88,101,242,.5);">N</div>
-      <span style="font-family:'Fredoka One',cursive;font-size:15px;background:linear-gradient(135deg,#a5b4fc,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">NixAi · Game Hub</span>
-    </div>
-    <div class="discord-badge">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.053a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.075.075 0 0 0-.041-.104 13.175 13.175 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-      Discord Activity
-    </div>
-    <h1>Game Hub</h1>
-    <p>Play with friends right inside your voice channel</p>
-    <!-- Live stats bar -->
-    <div id="live-stats-bar" style="display:flex;align-items:center;justify-content:center;gap:14px;margin-top:12px;flex-wrap:wrap;">
-      <div style="display:flex;align-items:center;gap:6px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:20px;padding:5px 13px;">
-        <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;animation:livePulse 1.5s ease infinite;"></span>
-        <span style="font-size:12px;font-weight:800;color:#4ade80;" id="stat-players">🔥 — players online</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;background:rgba(249,192,35,.1);border:1px solid rgba(249,192,35,.25);border-radius:20px;padding:5px 13px;">
-        <span style="font-size:12px;font-weight:800;color:#fbbf24;" id="stat-games">🎮 — active games</span>
-      </div>
-    </div>
-    <!-- Discord Auth Bar -->
-    <div class="discord-login-bar">
-      <button class="discord-login-btn" id="discord-login-btn" onclick="showAuthModal()">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.053a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.075.075 0 0 0-.041-.104 13.175 13.175 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-        Sign in with Discord
-      </button>
-      <div class="discord-profile-chip" id="discord-profile-chip" onclick="showAuthModal()">
-        <div class="dc-avatar" id="dc-avatar-wrap"></div>
-        <span class="dc-name" id="dc-username"></span>
-        <span class="dc-logout"><i class="fas fa-sign-out-alt"></i></span>
-      </div>
-    </div>
-  </div>
-  <!-- Quick action row below Discord auth -->
-  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:6px;padding:0 16px;">
-    <button class="btn" style="background:rgba(249,192,35,.12);border:1px solid rgba(249,192,35,.25);color:var(--uno-yellow);font-size:12px;padding:7px 14px;" onclick="openStatsModal('stats')">
-      <i class="fas fa-chart-bar"></i> My Stats
-    </button>
-    <button class="btn" style="background:rgba(88,101,242,.12);border:1px solid rgba(88,101,242,.25);color:var(--accent2);font-size:12px;padding:7px 14px;" onclick="openStatsModal('lb')">
-      <i class="fas fa-trophy"></i> Leaderboard
-    </button>
-    <button class="btn" style="background:rgba(249,192,35,.12);border:1px solid rgba(249,192,35,.25);color:var(--uno-yellow);font-size:12px;padding:7px 14px;" onclick="openTournament()">
-      <i class="fas fa-crown"></i> Tournament
-    </button>
-  </div>
-  <div class="activity-grid">
-    <div class="activity-card uno-card">
-      <div class="card-glow"></div>
-      <span class="card-icon"><img src="https://suprosmith-coder.github.io/DCgamehub/cards/WC.png" alt="UNO" onerror="this.parentElement.innerHTML='<i class=\'fas fa-layer-group fa-icon-large\' style=\'color:#e8302c;\'></i>'"></span>
-      <div class="card-label">Card Game</div>
-      <div class="card-title">UNO</div>
-      <div class="card-desc">Draw, match, and shout UNO! Real-time multiplayer with house rules, stacking, 7-swap, and in-game chat.</div>
-      <div class="card-meta">
-        <span class="meta-pill"><i class="fas fa-users"></i> 2–10 Players</span>
-        <span class="meta-pill"><i class="fas fa-robot"></i> AI Mode</span>
-        <span class="meta-pill"><i class="fas fa-eye"></i> Spectate</span>
-      </div>
-      <button class="launch-btn btn-ripple"><i class="fas fa-rocket"></i> Launch Game</button>
-    </div>
-    <div class="activity-card tod-card" style="cursor:default;">
-      <div class="card-glow"></div>
-      <div class="coming-soon-glow"></div>
-      <span class="card-icon"><i class="fas fa-bullseye fa-icon-large" style="color:#ec4899;opacity:.55;"></i></span>
-      <div class="card-label" style="color:#a78bfa;">Party Game</div>
-      <div class="card-title" style="opacity:.65;">Truth or Dare</div>
-      <div class="card-desc" style="opacity:.55;">Epic party mode with AI-powered truths, dares, and wild cards is under construction. Stay tuned!</div>
-      <div class="card-meta">
-        <span class="coming-soon-badge"><i class="fas fa-hammer"></i> Coming Soon</span>
-      </div>
-      <button class="launch-btn" style="background:rgba(124,58,237,.25);color:#a78bfa;box-shadow:none;cursor:not-allowed;opacity:.7;" disabled><i class="fas fa-lock"></i> Coming Soon</button>
-    </div>
-  </div>
-</div>
-
-<!-- LOBBY BROWSER -->
-<div id="screen-lobby-browser" class="screen">
-  <div class="browser-topbar">
-    <button class="back-btn" id="browser-back-btn"><i class="fas fa-arrow-left"></i> Back</button>
-    <div class="topbar-title" id="browser-title"><i class="fas fa-layer-group"></i> UNO Lobbies</div>
-    <button class="lobby-refresh-btn" id="browser-refresh-btn"><i class="fas fa-sync-alt"></i> Refresh</button>
-  </div>
-  <div class="browser-content">
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="lobby-box" id="browser-name-box">
-        <h3>Your Name</h3>
-        <div class="field-label">Display Name</div>
-        <input id="browser-inp-name" class="inp" type="text" maxlength="18" placeholder="Enter your name…">
-        <div class="btn-row" style="margin-top:12px;">
-          <button class="btn btn-primary" id="browser-confirm-name" disabled>
-            Continue <i class="fas fa-arrow-right"></i>
-          </button>
-        </div>
-      </div>
-      <div id="browser-room-section" style="display:none;flex-direction:column;gap:12px;">
-        <!-- ── Solo AI Quick Launch ── -->
-        <div style="background:rgba(129,140,248,.07);border:1px solid rgba(129,140,248,.22);border-radius:14px;padding:14px 16px;">
-          <div style="font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--ai-color);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
-            <i class="fas fa-robot"></i> Solo vs AI
-          </div>
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <div style="flex:1;min-width:140px;">
-              <div style="font-size:11px;font-weight:800;color:var(--muted);margin-bottom:5px;">Game Mode</div>
-              <select id="ai-game-type-select" class="inp" style="cursor:pointer;padding:8px 10px;font-size:12px;">
-                <option value="uno">🃏 UNO</option>
-                <option value="tod">🎯 Truth or Dare</option>
-              </select>
-            </div>
-            <div style="flex:1;min-width:140px;" id="ai-opponent-count-wrap">
-              <div style="font-size:11px;font-weight:800;color:var(--muted);margin-bottom:5px;">AI Opponents</div>
-              <select id="browser-ai-count" class="inp" style="cursor:pointer;padding:8px 10px;font-size:12px;">
-                <option value="1">1 opponent</option>
-                <option value="2" selected>2 opponents</option>
-                <option value="3">3 opponents</option>
-                <option value="4">4 opponents</option>
-              </select>
-            </div>
-          </div>
-          <div class="ai-difficulty-row" id="ai-diff-row">
-            <button class="diff-btn active" data-diff="normal" onclick="selectDifficulty(this,'normal')">⚡ Normal</button>
-            <button class="diff-btn" data-diff="hard" onclick="selectDifficulty(this,'hard')">🧠 Smart</button>
-            <button class="diff-btn" data-diff="chaos" onclick="selectDifficulty(this,'chaos')">🃏 Chaos</button>
-          </div>
-          <button class="btn btn-ai btn-ripple" id="browser-play-ai-btn" style="width:100%;margin-top:10px;">
-            <i class="fas fa-robot"></i> Play vs AI
-          </button>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-danger" id="browser-create-btn" style="flex:1;"><i class="fas fa-dice"></i> Create Multiplayer Lobby</button>
-        </div>
-        <!-- Join by code -->
-        <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.22);border-radius:14px;padding:14px 16px;">
-          <div style="font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--accent2);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
-            <i class="fas fa-key"></i> Join by Code
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input id="browser-join-code-inp" class="inp code-inp" type="text" maxlength="6" placeholder="A B C 1 2 3" style="flex:1;font-size:18px;letter-spacing:.3em;text-align:center;text-transform:uppercase;">
-            <button class="btn btn-primary" id="browser-join-code-btn" style="flex-shrink:0;padding:11px 16px;" disabled>
-              <i class="fas fa-sign-in-alt"></i> Join
-            </button>
-          </div>
-        </div>
-        <div class="section-title"><i class="fas fa-door-open"></i> Active Lobbies</div>
-        <div id="lobby-cards-grid" class="lobby-cards-grid">
-          <div class="no-lobbies"><i class="fas fa-satellite-dish"></i>Searching for lobbies…</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- LOBBY (waiting room) -->
-<div id="screen-lobby" class="screen">
-  <div class="game-topbar">
-    <button class="back-btn" id="lobby-back-btn"><i class="fas fa-arrow-left"></i> Back</button>
-    <div class="topbar-title" id="lobby-title"><i class="fas fa-layer-group"></i> UNO Lobby</div>
-    <div class="topbar-meta" id="lobby-player-count">0 players</div>
-  </div>
-  <div style="width:100%;max-width:480px;padding:20px 16px;display:flex;flex-direction:column;gap:16px;">
-    <div class="lobby-box" id="lobby-room-box">
-      <div style="display:flex;gap:10px;flex-direction:column;">
-        <div id="room-code-display" class="room-code-display" style="display:none;">
-          <div class="code-big" id="room-code-text">——</div>
-          <p>Share this code with friends</p>
-        </div>
-        <div class="lobby-divider">or vs AI</div>
-        <div class="ai-mode-row">
-          <div class="ai-mode-label">
-            <i class="fas fa-robot"></i>
-            <div>Solo AI Mode<small>Play alone vs AI opponents</small></div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="ai-mode-toggle">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div id="ai-count-row" style="display:none;">
-          <div class="field-label">Number of AI Opponents</div>
-          <select id="ai-count-select" class="inp" style="cursor:pointer;">
-            <option value="1">1 AI opponent</option>
-            <option value="2" selected>2 AI opponents</option>
-            <option value="3">3 AI opponents</option>
-            <option value="4">4 AI opponents</option>
-          </select>
-        </div>
-        <button class="btn btn-ai" id="btn-play-ai" style="display:none;"><i class="fas fa-robot"></i> Play vs AI</button>
-        <div class="lobby-divider">or join existing</div>
-        <div class="field-label">Room Code</div>
-        <input id="inp-room-code" class="inp code-inp" type="text" maxlength="6" placeholder="A B C 1 2 3">
-        <button class="btn btn-secondary" id="btn-join"><i class="fas fa-sign-in-alt"></i> Join Room</button>
-      </div>
-    </div>
-    <div class="lobby-box" id="lobby-waiting-box" style="display:none;">
-      <h3 style="margin-top:4px;">Players in Room</h3>
-      <div class="lobby-players" id="lobby-player-list"></div>
-
-      <!-- House Rules -->
-      <div class="house-rules-panel" id="house-rules-panel" style="display:none;">
-        <div class="house-rules-title"><i class="fas fa-scroll"></i> House Rules</div>
-        <div class="house-rule-row">
-          <div><div class="house-rule-label">Stack +2s</div><div class="house-rule-desc">Play +2 on a +2 to pass it on</div></div>
-          <label class="toggle-switch"><input type="checkbox" id="rule-stack2"><span class="toggle-slider"></span></label>
-        </div>
-        <div class="house-rule-row">
-          <div><div class="house-rule-label">7 = Swap Hands</div><div class="house-rule-desc">Playing a 7 swaps hands with a player</div></div>
-          <label class="toggle-switch"><input type="checkbox" id="rule-seven"><span class="toggle-slider"></span></label>
-        </div>
-        <div class="house-rule-row">
-          <div><div class="house-rule-label">0 = Rotate Hands</div><div class="house-rule-desc">Playing a 0 rotates all hands</div></div>
-          <label class="toggle-switch"><input type="checkbox" id="rule-zero"><span class="toggle-slider"></span></label>
-        </div>
-        <div class="house-rule-row">
-          <div><div class="house-rule-label">Multi-Stack</div><div class="house-rule-desc">Play multiple cards of same number</div></div>
-          <label class="toggle-switch"><input type="checkbox" id="rule-multistack" checked><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-
-      <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
-        <button class="btn btn-success" id="btn-start-game" disabled style="display:none;">
-          <i class="fas fa-play"></i> Start Game
-        </button>
-        <div id="lobby-waiting-msg" style="font-size:12px;color:var(--muted);font-weight:700;text-align:center;">
-          Waiting for host to start…
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- DEAL ANIMATION SCREEN -->
-<div id="screen-dealing" class="screen">
-  <div class="deal-scene">
-    <div class="deal-title" id="deal-title">🃏 Shuffling Deck…</div>
-    <div class="deal-deck-area" id="deal-deck-area">
-      <!-- Cards stack built by JS -->
-    </div>
-    <div class="deal-players-row" id="deal-players-row"></div>
-    <div class="deal-status" id="deal-status">Preparing the cards…</div>
-  </div>
-</div>
-
-<!-- UNO GAME -->
-<div id="screen-uno" class="screen">
-  <div class="game-topbar">
-    <button class="back-btn" id="uno-leave-btn"><i class="fas fa-door-open"></i> Leave</button>
-    <div class="topbar-title">
-      <i class="fas fa-layer-group"></i> UNO
-      <span id="ai-mode-badge" style="display:none;background:rgba(129,140,248,.2);border:1px solid rgba(129,140,248,.35);border-radius:8px;padding:2px 8px;font-size:10px;color:var(--ai-color);font-family:'Nunito',sans-serif;font-weight:800;">AI</span>
-      <span id="spectator-badge" style="display:none;background:rgba(107,114,128,.2);border:1px solid rgba(107,114,128,.35);border-radius:8px;padding:2px 8px;font-size:10px;color:#9ca3af;font-family:'Nunito',sans-serif;font-weight:800;"><i class="fas fa-eye"></i> SPECTATING</span>
-    </div>
-    <div class="topbar-meta">
-      <span id="active-color-label"></span>
-      Round <span id="uno-round">1</span>
-      <div class="turn-timer-wrap" id="topbar-timer" style="display:none;">
-        <svg class="turn-timer-ring" viewBox="0 0 20 20">
-          <circle class="ring-bg" cx="10" cy="10" r="8"/>
-          <circle class="ring-fg" id="timer-ring-fg" cx="10" cy="10" r="8"/>
-        </svg>
-        <span class="turn-timer-num" id="topbar-timer-num">25</span>
-      </div>
-    </div>
-  </div>
-  <div class="uno-table">
-    <div class="players-row" id="uno-players"></div>
-    <div class="game-arena">
-      <div class="arena-ring"></div>
-      <div class="arena-ring-2"></div>
-      <div class="turn-arrows">
-        <svg width="220" height="220" viewBox="0 0 220 220">
-          <defs>
-            <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-              <polygon points="0 0,6 3,0 6" fill="rgba(249,192,35,.5)"/>
-            </marker>
-          </defs>
-          <path d="M 110 20 A 90 90 0 1 1 20 110" fill="none" stroke="rgba(249,192,35,.28)" stroke-width="2" stroke-dasharray="8 4" marker-end="url(#arrowhead)" id="turn-arrow-path"/>
-        </svg>
-      </div>
-      <div class="discard-pile" id="discard-pile">
-        <div class="drop-zone" id="discard-drop-zone" title="Drop card here to play"></div>
-      </div>
-      <div class="draw-pile-btn" id="draw-pile-btn" title="Draw a card">
-        <div class="draw-pile-inner">
-          <div id="draw-pile-card" style="width:62px;height:93px;position:relative;flex-shrink:0;">
-            <img src="https://suprosmith-coder.github.io/DCgamehub/cards/UB.png" alt="Card Back" style="width:62px;height:93px;border-radius:10px;display:block;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,.5);" onerror="this.style.display='none';this.parentElement.innerHTML+='<div class=\'card-back-css\' style=\'width:62px;height:93px;\'><div class=\'card-back-logo\'>UNO</div></div>'">
-            <div class="draw-stack-badge" id="draw-stack-badge" style="display:none;">0</div>
-          </div>
-          <div class="draw-pile-label">DRAW</div>
-        </div>
-      </div>
-    </div>
-    <div class="game-log" id="game-log"></div>
-  </div>
-  <div class="your-hand" id="your-hand-area">
-    <div class="turn-indicator" id="turn-indicator">
-      <i class="fas fa-hourglass-half"></i> Waiting for turn…
-    </div>
-    <div id="stack-mode-indicator" style="display:none;" class="stack-mode-bar">
-      <i class="fas fa-layer-group"></i>
-      Multi-stacking — select same-number cards
-      <span class="stack-count-badge" id="stack-count-badge">0</span>
-    </div>
-    <div class="hand-timer-bar" id="hand-timer-bar">
-      <div class="hand-timer-fill" id="hand-timer-fill" style="width:100%"></div>
-    </div>
-    <div class="hand-cards" id="hand-cards"></div>
-    <div class="action-bar">
-      <button class="play-btn" id="play-btn" disabled>
-        <i class="fas fa-play"></i> Play Card<span id="play-btn-count" style="display:none;"> (0)</span>
-      </button>
-      <button class="uno-shout-btn" id="uno-shout-btn">UNO!</button>
-    </div>
-    <div class="spectator-indicator" id="spectator-indicator" style="display:none;">
-      <i class="fas fa-eye"></i> Spectating — game in progress
-    </div>
-  </div>
-
-  <!-- In-game chat -->
-  <div class="chat-panel collapsed" id="chat-panel">
-    <div class="chat-header" id="chat-toggle">
-      <div class="chat-title">
-        <i class="fas fa-comments"></i> Chat
-        <span class="chat-unread" id="chat-unread">0</span>
-      </div>
-      <span class="chat-toggle" id="chat-chevron"><i class="fas fa-chevron-up"></i></span>
-    </div>
-    <div class="chat-messages" id="chat-messages"></div>
-    <div class="chat-input-row">
-      <input class="chat-inp" id="chat-inp" placeholder="Say something…" maxlength="120">
-      <button class="chat-send" id="chat-send"><i class="fas fa-paper-plane"></i></button>
-    </div>
-  </div>
-</div>
-
-<!-- 7-SWAP MODAL -->
-<div class="modal-overlay" id="swap-modal">
-  <div class="modal-box">
-    <h3>🔄 Swap Hands</h3>
-    <p style="color:var(--muted);font-size:13px;font-weight:700;margin-bottom:16px;">Choose a player to swap hands with!</p>
-    <div id="swap-player-list" style="display:flex;flex-direction:column;gap:8px;"></div>
-  </div>
-</div>
-
-<!-- TRUTH OR DARE -->
-<div id="screen-tod" class="screen">
-  <div class="game-topbar">
-    <button class="back-btn" id="tod-back-btn"><i class="fas fa-arrow-left"></i> Leave</button>
-    <div class="topbar-title"><i class="fas fa-bullseye"></i> Truth or Dare</div>
-    <div class="topbar-meta">Round <span id="tod-round">1</span></div>
-  </div>
-  <div class="tod-arena">
-    <div class="tod-players" id="tod-players"></div>
-    <div class="tod-wheel-area">
-      <div class="wheel-ring" id="tod-wheel">
-        <div class="wheel-inner">
-          <i class="fas fa-bullseye" id="wheel-icon"></i>
-          <span id="wheel-label">Spin!</span>
-        </div>
-      </div>
-      <div class="tod-choice-btns" id="tod-choice-btns" style="display:none;">
-        <button class="tod-btn tod-truth-btn"><i class="fas fa-comment"></i> Truth</button>
-        <button class="tod-btn tod-dare-btn"><i class="fas fa-fire"></i> Dare</button>
-        <button class="tod-btn tod-wild-btn"><i class="fas fa-bolt"></i> Wild</button>
-      </div>
-    </div>
-    <div id="tod-prompt-area"></div>
-    <div id="tod-scoreboard-area"></div>
-  </div>
-</div>
-
-<!-- Color Picker Modal -->
-<div class="modal-overlay" id="color-modal">
-  <div class="color-modal">
-    <h3>Choose a Color</h3>
-    <div class="color-picker-grid">
-      <button class="color-pick-btn cpb-red"><i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i></button>
-      <button class="color-pick-btn cpb-blue"><i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i></button>
-      <button class="color-pick-btn cpb-yellow"><i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i></button>
-      <button class="color-pick-btn cpb-green"><i class="fas fa-circle" style="color:rgba(255,255,255,.9);"></i></button>
-    </div>
-  </div>
-</div>
-
-<!-- Command Card Modal -->
-<div class="modal-overlay" id="command-modal">
-  <div class="modal-box" style="max-width:400px;">
-    <div style="font-size:36px;margin-bottom:8px;">🃏</div>
-    <h3 style="color:#c084fc;">Command Card!</h3>
-    <p style="color:var(--muted);font-size:12px;font-weight:700;margin-bottom:10px;">You may issue any command. Type it or tap a suggestion below!</p>
-    <!-- Quick suggestions -->
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;" id="cmd-suggestions">
-      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Everyone draw 2 cards')">Everyone draw 2</button>
-      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Everyone draw 4 cards')">Everyone draw 4</button>
-      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Skip the next 2 players')">Skip next 2</button>
-      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Reverse the turn order')">Reverse</button>
-      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Next player draws 3 cards')">Next +3</button>
-      <button class="btn" style="padding:5px 10px;font-size:11px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);" onclick="setCmdSuggestion('Everyone skip their next turn')">Everyone skip</button>
-    </div>
-    <textarea id="command-card-inp" placeholder="Or type your own command…" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(192,132,252,.3);border-radius:10px;padding:11px 14px;color:#fff;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;outline:none;resize:vertical;min-height:70px;box-sizing:border-box;"></textarea>
-    <div style="margin-top:14px;display:flex;gap:8px;">
-      <button class="btn btn-secondary" id="command-card-cancel" style="flex:1;">Cancel</button>
-      <button class="btn" id="command-card-confirm" style="flex:2;background:linear-gradient(135deg,#9333ea,#7c3aed);color:#fff;box-shadow:0 4px 14px rgba(147,51,234,.4);">
-        <i class="fas fa-bolt"></i> Issue Command!
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Combo Banner Overlay -->
-<div class="combo-overlay" id="combo-overlay">
-  <div class="combo-banner">
-    <div class="combo-label" id="combo-label">COMBO!</div>
-    <div class="combo-sub" id="combo-sub">3 Cards!</div>
-  </div>
-</div>
-
-<!-- Music Toggle Button -->
-<button class="music-btn" id="music-btn" onclick="toggleMusic()" title="Toggle background music">
-  <i class="fas fa-music" id="music-icon"></i>
-  <span id="music-label">Music</span>
-</button>
-
-<!-- Shard Shop Modal -->
-<div class="shop-modal-overlay" id="shop-modal">
-  <div class="shop-box">
-    <div class="shop-header">
-      <div class="shop-title">💎 Shard Shop</div>
-      <button class="shop-close" onclick="closeShop()"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="shop-balance">💎 <span id="shop-shard-count">0</span> Shards Available</div>
-
-    <div class="shop-section-title"><i class="fas fa-palette"></i> Card Back Colors</div>
-    <div class="shop-grid" id="shop-card-backs"></div>
-
-    <div class="shop-section-title"><i class="fas fa-star"></i> Perks</div>
-    <div class="shop-grid" id="shop-perks"></div>
-
-    <div class="shop-preview">
-      <div class="shop-preview-label"><i class="fas fa-eye"></i> Preview</div>
-      <div class="card-color-preview" id="shop-preview-area">
-        <div class="card-color-swatch" style="background:#e8302c;">1</div>
-        <div class="card-color-swatch" style="background:#1a73e8;">2</div>
-        <div class="card-color-swatch" style="background:#2db552;">3</div>
-        <div class="card-color-swatch" style="background:#f9c023;">4</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Stats / Leaderboard / Friends Modal -->
-<div class="big-modal-overlay" id="stats-modal">
-  <div class="big-modal-box">
-    <div class="big-modal-header">
-      <div class="big-modal-title" id="stats-modal-title"><i class="fas fa-chart-bar"></i> Profile</div>
-      <button class="big-modal-close" onclick="document.getElementById('stats-modal').classList.remove('show')"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="big-modal-tabs">
-      <div class="bm-tab active" id="tab-stats" onclick="switchStatsTab('stats')"><i class="fas fa-chart-bar"></i> Stats</div>
-      <div class="bm-tab" id="tab-lb" onclick="switchStatsTab('lb')"><i class="fas fa-trophy"></i> Leaderboard</div>
-      <div class="bm-tab" id="tab-friends" onclick="switchStatsTab('friends')"><i class="fas fa-users"></i> Friends</div>
-    </div>
-    <div class="big-modal-body" id="stats-modal-body">
-      <div class="lb-loading"><div class="auth-spinner" style="margin:0 auto 10px;"></div>Loading…</div>
-    </div>
-  </div>
-</div>
-
-<!-- Tournament Modal -->
-<div class="tourn-modal-overlay" id="tourn-modal">
-  <div class="tourn-box">
-    <div class="tourn-header">
-      <div class="tourn-title"><i class="fas fa-crown"></i> Tournament</div>
-      <button class="big-modal-close" onclick="closeTournament()"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="tourn-body" id="tourn-body">
-      <!-- Filled by JS -->
-    </div>
-  </div>
-</div>
-
-<!-- Daily Bonus (injected by JS) -->
-<div id="daily-bonus-anchor"></div>
-
-<!-- Win Modal -->
-<div class="modal-overlay" id="win-modal">
-  <div class="modal-box win-modal-content">
-    <i class="fas fa-trophy win-icon" id="win-icon"></i>
-    <h3 id="win-title">You Win!</h3>
-    <p class="win-subtitle" id="win-subtitle">Great game!</p>
-    <div id="win-shards-earned" style="display:none;background:rgba(249,192,35,.1);border:1px solid rgba(249,192,35,.3);border-radius:12px;padding:10px 16px;margin:10px 0;font-family:'Fredoka One',cursive;font-size:18px;color:var(--uno-yellow);">
-      💎 <span id="win-shards-num">0</span> Shards Earned!
-    </div>
-    <div id="win-streak-display" style="display:none;font-size:12px;font-weight:800;color:#a5b4fc;margin-bottom:4px;"></div>
-    <div class="btn-row" style="margin-top:16px;gap:8px;display:flex;flex-wrap:wrap;justify-content:center;">
-      <button class="btn btn-primary btn-ripple" id="win-modal-btn">
-        <i class="fas fa-undo"></i> Back to Lobby
-      </button>
-      <button class="btn" id="win-rematch-btn" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 4px 14px rgba(34,197,94,.4);display:none;">
-        <i class="fas fa-redo"></i> Rematch
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast -->
-<div class="toast" id="toast"></div>
-
-<script>
 'use strict';
 // ═══════════════════════════════════════════════════════════════
 // CONFIG
@@ -2881,17 +2305,39 @@ async function tryInitDiscordSdk() {
     const { DiscordSDK } = await import('./.proxy/esm.sh/@discord/embedded-app-sdk@1');
     discordSdk = new DiscordSDK(CFG.DISCORD_CLIENT_ID);
     await discordSdk.ready();
-    const { code } = await discordSdk.commands.authorize({
+
+    // ── Activity Auth: no OAuth redirects inside the Activity iframe ──
+    // authenticate() gives us a scoped access token without any page navigation.
+    await discordSdk.commands.authenticate({
       client_id: CFG.DISCORD_CLIENT_ID,
       response_type: 'code',
-      state: crypto.randomUUID(),
+      state: '',
       prompt: 'none',
       scope: ['identify', 'guilds.members.read'],
-    });
-    // Exchange the code immediately — no redirects, no popups, no copy-paste
-    if (code) await _exchangeOAuthCode(code);
+    }).catch(() => {});
+
+    // Get user identity directly from the SDK
+    let sdkUser = null;
+    try { sdkUser = await discordSdk.commands.getUser(); } catch(e) {}
+
+    if (sdkUser && sdkUser.id) {
+      const dcUser = {
+        discord_id: sdkUser.id,
+        username: sdkUser.username + (sdkUser.discriminator && sdkUser.discriminator !== '0' ? '#' + sdkUser.discriminator : ''),
+        avatar_url: sdkUser.avatar
+          ? `https://cdn.discordapp.com/avatars/${sdkUser.id}/${sdkUser.avatar}.png?size=128`
+          : null,
+      };
+      saveDiscordUser(dcUser);
+      if (!MY_NAME) MY_NAME = dcUser.username.split('#')[0];
+      await syncUserWithSupabase(dcUser);
+      updateDiscordProfileUI(dcUser);
+      showToast(`Welcome, ${dcUser.username}! 👋`, 'fa-check-circle', 3000);
+      const authModal = document.getElementById('auth-modal');
+      if (authModal) authModal.classList.remove('show');
+    }
     return discordSdk;
-  } catch(e) { console.log('Discord SDK not available', e?.message||e); return null; }
+  } catch(e) { console.log('Discord SDK not available:', e?.message || e); return null; }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3543,10 +2989,6 @@ const DC_TOKEN_KEY  = 'nixai_dc_token_v1';
 // The redirect URI must be registered in your Discord app OAuth2 settings.
 // For local/Termux dev: use your Cloudflare tunnel URL + /oauth/callback
 // For prod: your actual domain
-function getOAuthRedirectUri() {
-  return window.location.origin + window.location.pathname;
-}
-
 function showAuthModal() {
   const user = getDiscordUser();
   const modal = document.getElementById('auth-modal');
@@ -3585,34 +3027,33 @@ function saveDiscordUser(u) {
 }
 
 function startDiscordOAuth() {
-  const state = Math.random().toString(36).slice(2,10);
-  sessionStorage.setItem('dc_oauth_state', state);
-  const params = new URLSearchParams({
-    client_id: CFG.DISCORD_CLIENT_ID,
-    redirect_uri: getOAuthRedirectUri(),
-    response_type: 'code',
-    scope: 'identify',
-    state,
-  });
-  const oauthUrl = `https://discord.com/api/oauth2/authorize?${params}`;
-
-  // ── Path 1: Discord Embedded App SDK (running inside a Discord Activity) ──
-  // Auth is handled at boot inside tryInitDiscordSdk() via discordSdk.commands.authorize().
-  // The SDK flow keeps everything inside the iframe — no redirects, no popups, no copy-paste.
-  // If the user reaches this button while the SDK is active, re-run the SDK flow.
+  // ── Path 1: Running inside a Discord Activity ──
+  // The SDK already authenticated at boot via tryInitDiscordSdk().
+  // Just re-run it if the user explicitly hits "Sign in".
   if (discordSdk) {
     const existingUser = getDiscordUser();
     if (existingUser) {
       showToast(`Already signed in as ${existingUser.username} ✓`, 'fa-check-circle', 3000);
+      document.getElementById('auth-modal')?.classList.remove('show');
     } else {
-      // Re-run the SDK authorize + exchange in case boot auth failed or user logged out
       showToast('Signing in via Discord…', 'fa-spinner', 2000);
       tryInitDiscordSdk().catch(() => showToast('Sign-in failed — try again', 'fa-times-circle'));
     }
     return;
   }
 
-  // ── Path 2: Popup (normal browser outside Discord) ──
+  // ── Path 2: Normal browser (outside Discord) — popup flow ──
+  const state = Math.random().toString(36).slice(2, 10);
+  sessionStorage.setItem('dc_oauth_state', state);
+  const params = new URLSearchParams({
+    client_id: CFG.DISCORD_CLIENT_ID,
+    redirect_uri: window.location.origin + window.location.pathname,
+    response_type: 'code',
+    scope: 'identify',
+    state,
+  });
+  const oauthUrl = `https://discord.com/api/oauth2/authorize?${params}`;
+
   const popup = window.open(oauthUrl, 'discord_oauth', 'width=500,height=700,menubar=no,toolbar=no');
   if (popup && !popup.closed) {
     const btnArea = document.getElementById('auth-btn-area');
@@ -3638,49 +3079,22 @@ function startDiscordOAuth() {
         }
       } catch(e) { /* cross-origin while on discord.com — expected */ }
     }, 500);
+
     setTimeout(() => {
       clearInterval(poll);
       if (!popup.closed) popup.close();
-      document.getElementById('auth-loading').classList.remove('show');
+      document.getElementById('auth-loading')?.classList.remove('show');
       document.getElementById('auth-btn-area').style.display = '';
     }, 300000);
     return;
   }
 
-  // ── Path 3: Same-tab redirect (fallback) ──
+  // ── Path 3: Same-tab redirect fallback ──
   window.location.href = oauthUrl;
 }
 
-function _showManualCodeEntry() {
-  // Inside Discord Activity: user opens the OAuth URL in their browser,
-  // completes login, then Discord redirects to our redirect_uri with ?code=XXX.
-  // They copy that code and paste it here.
-  const btnArea = document.getElementById('auth-btn-area');
-  btnArea.innerHTML = `
-    <div style="font-size:13px;font-weight:700;color:#d1d5db;margin-bottom:12px;line-height:1.5;">
-      Discord opened in your browser. After signing in, Discord will redirect you to a page with
-      <code style="background:rgba(255,255,255,.1);border-radius:5px;padding:1px 6px;font-size:12px;">?code=...</code>
-      in the URL. Copy that code and paste it below.
-    </div>
-    <input id="manual-oauth-code" class="inp" placeholder="Paste the code here…"
-      style="font-size:13px;letter-spacing:.05em;margin-bottom:10px;"
-      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-    <button class="discord-login-btn" style="width:100%;justify-content:center;" onclick="_submitManualCode()">
-      <i class="fas fa-check" style="margin-right:6px;"></i> Submit Code
-    </button>
-    <button class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:12px;" onclick="document.getElementById('auth-modal').classList.remove('show')">
-      Cancel
-    </button>
-  `;
-}
-
-async function _submitManualCode() {
-  const inp = document.getElementById('manual-oauth-code');
-  const code = inp?.value?.trim();
-  if (!code) { showToast('Paste the code first!', 'fa-exclamation-triangle'); return; }
-  await _exchangeOAuthCode(code);
-}
 async function _exchangeOAuthCode(code) {
+  // Used only in browser (non-Activity) popup flow
   const btnArea = document.getElementById('auth-btn-area');
   const loading = document.getElementById('auth-loading');
   btnArea.style.display = 'none';
@@ -3693,10 +3107,10 @@ async function _exchangeOAuthCode(code) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${CFG.SUPABASE_ANON_KEY}`,
       },
-      body: JSON.stringify({ code, redirect_uri: getOAuthRedirectUri() }),
+      body: JSON.stringify({ code, redirect_uri: window.location.origin + window.location.pathname }),
     });
     if (!res.ok) throw new Error('Edge function error: ' + await res.text());
-    const { user, access_token } = await res.json();
+    const { user } = await res.json();
     if (!user?.id) throw new Error('No user returned');
     document.getElementById('auth-loading-text').textContent = 'Syncing your profile…';
     const dcUser = {
@@ -3705,12 +3119,11 @@ async function _exchangeOAuthCode(code) {
       avatar_url: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : null,
     };
     saveDiscordUser(dcUser);
-    if (access_token) { try { localStorage.setItem(DC_TOKEN_KEY, access_token); } catch(e) {} }
     if (!MY_NAME) MY_NAME = dcUser.username.split('#')[0];
     await syncUserWithSupabase(dcUser);
     updateDiscordProfileUI(dcUser);
     showToast(`Welcome, ${dcUser.username}! 👋`, 'fa-check-circle', 3500);
-    document.getElementById('auth-modal').classList.remove('show');
+    document.getElementById('auth-modal')?.classList.remove('show');
   } catch(e) {
     console.error('Discord OAuth error:', e);
     loading.classList.remove('show');
@@ -3720,79 +3133,51 @@ async function _exchangeOAuthCode(code) {
 }
 
 async function handleOAuthCallback() {
+  // Only runs in browser popup flow — not inside Discord Activity
+  if (discordSdk) return false; // SDK handles auth at boot
   const params = new URLSearchParams(window.location.search);
   const code  = params.get('code');
   const state = params.get('state');
   if (!code) return false;
-
-  // Validate state
   const savedState = sessionStorage.getItem('dc_oauth_state');
   if (state && savedState && state !== savedState) {
     showToast('OAuth state mismatch — try again', 'fa-exclamation-triangle');
     return false;
   }
-
-  // Clean URL
   window.history.replaceState({}, document.title, window.location.pathname);
-
-  // Show loading in auth modal
   const btnArea = document.getElementById('auth-btn-area');
   const loading = document.getElementById('auth-loading');
-  document.getElementById('auth-modal').classList.add('show');
+  document.getElementById('auth-modal')?.classList.add('show');
   btnArea.style.display = 'none';
   loading.classList.add('show');
   document.getElementById('auth-loading-text').textContent = 'Verifying with Discord…';
-
   try {
-    // Exchange code via Supabase Edge Function
-    // You need to deploy: supabase/functions/discord-oauth/index.ts
-    // See SQL schema + edge function code in comments below
     const res = await fetch(`${CFG.SUPABASE_URL}/functions/v1/discord-oauth`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${CFG.SUPABASE_ANON_KEY}`,
       },
-      body: JSON.stringify({ code, redirect_uri: getOAuthRedirectUri() }),
+      body: JSON.stringify({ code, redirect_uri: window.location.origin + window.location.pathname }),
     });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error('Edge function error: ' + err);
-    }
-
-    const { user, access_token } = await res.json();
+    if (!res.ok) throw new Error(await res.text());
+    const { user } = await res.json();
     if (!user?.id) throw new Error('No user returned');
-
     document.getElementById('auth-loading-text').textContent = 'Syncing your profile…';
-
-    // Save locally
     const dcUser = {
       discord_id: user.id,
       username: user.username + (user.discriminator && user.discriminator !== '0' ? '#' + user.discriminator : ''),
-      avatar_url: user.avatar
-        ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`
-        : null,
+      avatar_url: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : null,
     };
     saveDiscordUser(dcUser);
-    if (access_token) {
-      try { localStorage.setItem(DC_TOKEN_KEY, access_token); } catch(e) {}
-    }
-
-    // Set MY_NAME from Discord if not already set
     if (!MY_NAME) MY_NAME = dcUser.username.split('#')[0];
-
-    // Upsert profile in Supabase + load synced shards/inventory
     await syncUserWithSupabase(dcUser);
-
-    // Update UI
     updateDiscordProfileUI(dcUser);
     showToast(`Welcome, ${dcUser.username}! 👋`, 'fa-check-circle', 3500);
-    document.getElementById('auth-modal').classList.remove('show');
+    document.getElementById('auth-modal')?.classList.remove('show');
     return true;
-
   } catch(e) {
-    console.error('Discord OAuth error:', e);
+    console.error('Discord OAuth callback error:', e);
     loading.classList.remove('show');
     btnArea.style.display = '';
     showToast('Sign-in failed — try again', 'fa-times-circle');
@@ -4717,13 +4102,17 @@ async function refreshLobbyBrowser() {
 // BOOT
 // ═══════════════════════════════════════════════════════════════
 (async function boot() {
-  tryInitDiscordSdk().catch(()=>{});
+  // ── Discord Activity: SDK auth runs first, gets user identity directly ──
+  // ── Browser fallback: handles OAuth callback from popup if ?code= present ──
+  tryInitDiscordSdk().catch(() => {});
   const hasSupa = initSupabase();
   if (!hasSupa) console.warn('Running without Supabase.');
-  // Handle Discord OAuth callback if ?code= is in URL
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('code')) {
-    await handleOAuthCallback();
+  // Handle browser OAuth popup callback (non-Activity only)
+  if (!discordSdk) {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('code')) {
+      await handleOAuthCallback();
+    }
   }
   // Restore Discord profile chip if already logged in
   const existingUser = getDiscordUser();
@@ -4989,7 +4378,3 @@ document.addEventListener('DOMContentLoaded',()=>{
     qRow.appendChild(mkBtn('fa-user-circle','Profile',openProfileModal));
   },200);
 });
-</script>
-<script src="javascript.js"></script>
-</body>
-</html>
