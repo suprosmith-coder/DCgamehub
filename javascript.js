@@ -8,7 +8,6 @@ const CFG = {
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmeGFnd2N3YWFscm1hcXpoeWZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MzY5NzIsImV4cCI6MjA5MDIxMjk3Mn0.LMFfFRmqW34PT70zAOTj4zsUWmrDl_P4MXL0wZBkxYc',
   DISCORD_CLIENT_ID: '1487252546060947476',
   CARD_PATH: 'https://suprosmith-coder.github.io/DCgamehub/cards/',
-  GROQ_API_KEY: '',   // 🔑 Paste your Groq API key here
   TURN_SECONDS: 25,
   AI_THINK_MIN: 900,
   AI_THINK_MAX: 2800,
@@ -1430,7 +1429,7 @@ function executeAiTurn(aiId) {
   // Groq AI taunts — fire-and-forget, 25% chance on action cards or low hand
   const isActionCard = ['skip','reverse','draw2','wild4','wild','command'].includes(chosen.value);
   const isLowHand = hand.length <= 3;
-  const shouldTaunt = CFG.GROQ_API_KEY && (isActionCard ? Math.random() < 0.55 : Math.random() < 0.18 || isLowHand);
+  const shouldTaunt = (isActionCard ? Math.random() < 0.55 : Math.random() < 0.18 || isLowHand);
   if (shouldTaunt) {
     generateGroqUnoTaunt(aiName, personality.style, chosen, hand.length, chosenColor).then(taunt => {
       if (taunt && G && !G.over) {
@@ -2114,16 +2113,16 @@ function spinWheel() {
 function chooseTod(type) {
   document.getElementById('tod-choice-btns').style.display = 'none';
   const cur = todState.players[todState.currentIdx];
-  const useGroq = todAiMode && CFG.GROQ_API_KEY;
+  const useAi = todAiMode;
   document.getElementById('tod-prompt-area').innerHTML = `
     <div class="ai-thinking">
-      <i class="fas fa-${useGroq ? 'robot' : 'dice'}" style="color:var(--accent2);"></i>
-      <span>${useGroq ? 'AI is crafting your ' + type + '…' : 'Picking a ' + type + '…'}</span>
+      <i class="fas fa-${useAi ? 'robot' : 'dice'}" style="color:var(--accent2);"></i>
+      <span>${useAi ? 'AI is crafting your ' + type + '…' : 'Picking a ' + type + '…'}</span>
       <div class="ai-thinking-dots"><span></span><span></span><span></span></div>
     </div>`;
-  if (useGroq) {
+  if (useAi) {
     generateGroqPrompt(type, cur.name).then(prompt => showPrompt(type, prompt)).catch(() => {
-      // Fallback to static on error
+      // Fallback to static prompts on edge function error
       showPrompt(type, null);
     });
   } else {
@@ -2132,38 +2131,28 @@ function chooseTod(type) {
 }
 
 async function generateGroqPrompt(type, playerName) {
+  // Groq API key lives in Supabase Edge Function env secrets — never in the frontend
   const players = todState.players.map(p => p.name).join(', ');
   const round = todState.round;
   const recent = todPromptHistory.slice(-4).map(h => `"${h}"`).join(', ');
-  const systemMsg = `You are the host of a fun party game of Truth or Dare being played on Discord. Keep everything PG-13 — fun, a little embarrassing but never offensive, sexual, or harmful. Be creative, specific, and vary your style. Never repeat prompts.`;
-  const userMsg = `Generate ONE ${type} prompt for the player named "${playerName}". 
-Players in the game: ${players}. Round: ${round}.
-${recent ? `Recent prompts used (do NOT repeat these): ${recent}` : ''}
-Rules:
-- Truth: a question they must answer honestly. Make it personal, funny, or revealing.
-- Dare: an action they must perform right now (Discord-friendly, like sending a message, making a voice, sharing a photo, etc).
-- Wild: a rule or challenge that affects ALL players.
-Reply with ONLY the prompt text. No labels, no quotes, no explanation.`;
-
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const res = await fetch(`${CFG.SUPABASE_URL}/functions/v1/groq-ai`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${CFG.GROQ_API_KEY}`,
+      'Authorization': `Bearer ${CFG.SUPABASE_ANON_KEY}`,
     },
     body: JSON.stringify({
-      model: 'llama3-8b-8192',
-      messages: [
-        { role: 'system', content: systemMsg },
-        { role: 'user', content: userMsg },
-      ],
-      max_tokens: 120,
-      temperature: 1.1,
+      task: 'tod_prompt',
+      type,
+      playerName,
+      players,
+      round,
+      recentPrompts: recent,
     }),
   });
-  if (!res.ok) throw new Error('Groq error ' + res.status);
+  if (!res.ok) throw new Error('Edge function error ' + res.status);
   const data = await res.json();
-  const prompt = data.choices?.[0]?.message?.content?.trim();
+  const prompt = data.result?.trim();
   if (!prompt) throw new Error('Empty response');
   todPromptHistory.push(prompt);
   if (todPromptHistory.length > 20) todPromptHistory.shift();
@@ -2175,6 +2164,7 @@ Reply with ONLY the prompt text. No labels, no quotes, no explanation.`;
 // ═══════════════════════════════════════════════════════════════
 const _groqTauntCache = {}; // prevent duplicate in-flight requests per AI
 async function generateGroqUnoTaunt(aiName, style, playedCard, handSize, chosenColor) {
+  // Calls Supabase Edge Function — Groq API key lives server-side only
   if (_groqTauntCache[aiName]) return null; // already has one in flight
   _groqTauntCache[aiName] = true;
   try {
@@ -2182,36 +2172,25 @@ async function generateGroqUnoTaunt(aiName, style, playedCard, handSize, chosenC
       ? `${playedCard.value === 'wild4' ? 'Wild +4' : 'Wild'} (chose ${chosenColor})`
       : `${playedCard.color} ${VALUE_LABEL[playedCard.value] || playedCard.value}`;
     const playerName = G?.players[MY_ID]?.name || 'the human';
-    const styleDesc = style === 'aggressive' ? 'aggressive and competitive' : style === 'troll' ? 'chaotic troll, sarcastic and unpredictable' : 'calculating and strategic';
-    const systemMsg = `You are ${aiName}, an AI playing UNO. Your personality is ${styleDesc}. You speak in short punchy chat messages — max 12 words, no emojis unless it really fits. Stay in character. PG-13 only.`;
-    const context = handSize === 1
-      ? `You just played your last card and won!`
-      : handSize <= 2
-      ? `You just played ${cardDesc} and only have ${handSize} card${handSize===1?'':'s'} left.`
-      : `You just played ${cardDesc} against ${playerName}.`;
-    const userMsg = `${context} Write a single in-character reaction. No quotes, no labels, just the message.`;
-
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetch(`${CFG.SUPABASE_URL}/functions/v1/groq-ai`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${CFG.GROQ_API_KEY}`,
+        'Authorization': `Bearer ${CFG.SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify({
-        model: 'llama3-8b-8192',
-        messages: [
-          { role: 'system', content: systemMsg },
-          { role: 'user', content: userMsg },
-        ],
-        max_tokens: 40,
-        temperature: 1.2,
+        task: 'uno_taunt',
+        aiName,
+        style,
+        cardDesc,
+        handSize,
+        playerName,
       }),
     });
-    if (!res.ok) throw new Error('Groq ' + res.status);
+    if (!res.ok) throw new Error('Edge function error ' + res.status);
     const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || null;
+    return data.result?.trim() || null;
   } finally {
-    // Allow next taunt after a cooldown
     setTimeout(() => { delete _groqTauntCache[aiName]; }, 4000);
   }
 }
