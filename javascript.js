@@ -2325,8 +2325,8 @@ async function tryInitDiscordSdk() {
         discord_id: sdkUser.id,
         username: sdkUser.username + (sdkUser.discriminator && sdkUser.discriminator !== '0' ? '#' + sdkUser.discriminator : ''),
         avatar_url: sdkUser.avatar
-          ? `https://cdn.discordapp.com/avatars/${sdkUser.id}/${sdkUser.avatar}.png?size=128`
-          : null,
+          ? `https://cdn.discordapp.com/avatars/${sdkUser.id}/${sdkUser.avatar}.webp?size=128`
+          : `https://cdn.discordapp.com/embed/avatars/${parseInt(sdkUser.id) % 5}.png`,
       };
       saveDiscordUser(dcUser);
       if (!MY_NAME) MY_NAME = dcUser.username.split('#')[0];
@@ -3001,7 +3001,7 @@ function showAuthModal() {
     btnArea.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;background:rgba(88,101,242,.1);border:1px solid rgba(88,101,242,.25);border-radius:14px;padding:12px 14px;margin-bottom:14px;">
         ${user.avatar_url
-          ? `<img src="${user.avatar_url}" style="width:44px;height:44px;border-radius:50%;border:2px solid rgba(88,101,242,.5);" onerror="this.outerHTML='<div style=\\'width:44px;height:44px;border-radius:50%;background:rgba(88,101,242,.3);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;\\'>${(user.username||'?').slice(0,1).toUpperCase()}</div>'">`
+          ? `<img src="${user.avatar_url}" style="width:44px;height:44px;border-radius:50%;border:2px solid rgba(88,101,242,.5);object-fit:cover;" onerror="this.style.display='none';">`
           : `<div style="width:44px;height:44px;border-radius:50%;background:rgba(88,101,242,.3);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;">${(user.username||'?').slice(0,1).toUpperCase()}</div>`
         }
         <div style="flex:1;text-align:left;">
@@ -3116,7 +3116,7 @@ async function _exchangeOAuthCode(code) {
     const dcUser = {
       discord_id: user.id,
       username: user.username + (user.discriminator && user.discriminator !== '0' ? '#' + user.discriminator : ''),
-      avatar_url: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : null,
+      avatar_url: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.webp?size=128` : null,
     };
     saveDiscordUser(dcUser);
     if (!MY_NAME) MY_NAME = dcUser.username.split('#')[0];
@@ -3167,7 +3167,7 @@ async function handleOAuthCallback() {
     const dcUser = {
       discord_id: user.id,
       username: user.username + (user.discriminator && user.discriminator !== '0' ? '#' + user.discriminator : ''),
-      avatar_url: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : null,
+      avatar_url: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.webp?size=128` : null,
     };
     saveDiscordUser(dcUser);
     if (!MY_NAME) MY_NAME = dcUser.username.split('#')[0];
@@ -3283,7 +3283,17 @@ function updateDiscordProfileUI(user) {
     chipEl.classList.add('show');
     nameEl.textContent = user.username.split('#')[0];
     if (user.avatar_url) {
-      avatarWrap.innerHTML = `<img src="${user.avatar_url}" alt="${user.username}" onerror="this.outerHTML='${(user.username||'?').slice(0,1).toUpperCase()}'">`;
+      const fallbackInitial = (user.username || '?').slice(0, 1).toUpperCase();
+      const img = document.createElement('img');
+      img.src = user.avatar_url;
+      img.alt = user.username;
+      img.style.cssText = 'width:28px;height:28px;border-radius:50%;display:block;object-fit:cover;';
+      img.onerror = function() {
+        avatarWrap.textContent = fallbackInitial;
+        this.remove();
+      };
+      avatarWrap.innerHTML = '';
+      avatarWrap.appendChild(img);
     } else {
       avatarWrap.textContent = (user.username||'?').slice(0,1).toUpperCase();
     }
