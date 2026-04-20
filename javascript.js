@@ -2285,38 +2285,67 @@ async function tryInitDiscordSdk() {
     discordSdk = new DiscordSDK(CFG.DISCORD_CLIENT_ID);
     await discordSdk.ready();
 
-    // ── Activity Auth: no OAuth redirects inside the Activity iframe ──
-    // authenticate() gives us a scoped access token without any page navigation.
-    await discordSdk.commands.authenticate({
+    // ── Correct Activity auth pattern (same as Gartic Phone, Watch Together, etc.) ──
+    // authorize() runs entirely inside the iframe — no redirects, no popups, no external pages.
+    // Discord intercepts this call and returns a {code} directly.
+    const { code } = await discordSdk.commands.authorize({
       client_id: CFG.DISCORD_CLIENT_ID,
       response_type: 'code',
       state: '',
       prompt: 'none',
       scope: ['identify', 'guilds.members.read'],
-    }).catch(() => {});
+    });
 
-    // Get user identity directly from the SDK
-    let sdkUser = null;
-    try { sdkUser = await discordSdk.commands.getUser(); } catch(e) {}
+    if (!code) throw new Error('No code from authorize');
 
-    if (sdkUser && sdkUser.id) {
-      const dcUser = {
-        discord_id: sdkUser.id,
-        username: sdkUser.username + (sdkUser.discriminator && sdkUser.discriminator !== '0' ? '#' + sdkUser.discriminator : ''),
-        avatar_url: sdkUser.avatar
-          ? `https://cdn.discordapp.com/avatars/${sdkUser.id}/${sdkUser.avatar}.webp?size=128`
-          : `https://cdn.discordapp.com/embed/avatars/${parseInt(sdkUser.id) % 5}.png`,
-      };
-      saveDiscordUser(dcUser);
-      if (!MY_NAME) MY_NAME = dcUser.username.split('#')[0];
-      await syncUserWithSupabase(dcUser);
-      updateDiscordProfileUI(dcUser);
-      showToast(`Welcome, ${dcUser.username}! 👋`, 'fa-check-circle', 3000);
-      const authModal = document.getElementById('auth-modal');
-      if (authModal) authModal.classList.remove('show');
-    }
+    // Exchange the code server-side via Supabase Edge Function — never hits discord.com from the frontend
+    await _exchangeActivityCode(code);
     return discordSdk;
-  } catch(e) { console.log('Discord SDK not available:', e?.message || e); return null; }
+  } catch(e) {
+    console.log('Discord SDK not available:', e?.message || e);
+    discordSdk = null;
+    return null;
+  }
+}
+
+async function _exchangeActivityCode(code) {
+  // Called only inside a Discord Activity — exchanges the SDK authorize() code server-side
+  try {
+    const res = await fetch(`${CFG.SUPABASE_URL}/functions/v1/discord-oauth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${CFG.SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        code,
+        redirect_uri: 'https://discord.com/api/v10/oauth2/token', // Activity token exchange uses this URI
+        is_activity: true,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.warn('Activity token exchange failed:', err);
+      return;
+    }
+    const { user } = await res.json();
+    if (!user?.id) return;
+    const dcUser = {
+      discord_id: user.id,
+      username: user.username + (user.discriminator && user.discriminator !== '0' ? '#' + user.discriminator : ''),
+      avatar_url: user.avatar
+        ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.webp?size=128`
+        : `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(user.id) % 5n)}.png`,
+    };
+    saveDiscordUser(dcUser);
+    if (!MY_NAME) MY_NAME = dcUser.username.split('#')[0];
+    await syncUserWithSupabase(dcUser);
+    updateDiscordProfileUI(dcUser);
+    showToast(`Welcome, ${dcUser.username}! 👋`, 'fa-check-circle', 3000);
+    document.getElementById('auth-modal')?.classList.remove('show');
+  } catch(e) {
+    console.warn('Activity code exchange error:', e?.message || e);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3006,17 +3035,36 @@ function saveDiscordUser(u) {
 }
 
 function startDiscordOAuth() {
-  // ── Path 1: Running inside a Discord Activity ──
-  // The SDK already authenticated at boot via tryInitDiscordSdk().
-  // Just re-run it if the user explicitly hits "Sign in".
+  // ── Inside Discord Activity ──
+  // SDK is always present here because boot awaits tryInitDiscordSdk().
+  // Never open external URLs — that triggers "disallowed webpage" error.
   if (discordSdk) {
     const existingUser = getDiscordUser();
     if (existingUser) {
       showToast(`Already signed in as ${existingUser.username} ✓`, 'fa-check-circle', 3000);
       document.getElementById('auth-modal')?.classList.remove('show');
     } else {
-      showToast('Signing in via Discord…', 'fa-spinner', 2000);
-      tryInitDiscordSdk().catch(() => showToast('Sign-in failed — try again', 'fa-times-circle'));
+      // Re-run the authorize flow in case boot auth failed silently
+      const btnArea = document.getElementById('auth-btn-area');
+      const loading = document.getElementById('auth-loading');
+      if (btnArea) btnArea.style.display = 'none';
+      if (loading) {
+        loading.classList.add('show');
+        document.getElementById('auth-loading-text').textContent = 'Signing in via Discord…';
+      }
+      tryInitDiscordSdk()
+        .then(sdk => {
+          if (!sdk || !getDiscordUser()) {
+            if (loading) loading.classList.remove('show');
+            if (btnArea) btnArea.style.display = '';
+            showToast('Sign-in failed — try again', 'fa-times-circle');
+          }
+        })
+        .catch(() => {
+          if (loading) loading.classList.remove('show');
+          if (btnArea) btnArea.style.display = '';
+          showToast('Sign-in failed — try again', 'fa-times-circle');
+        });
     }
     return;
   }
@@ -4092,11 +4140,13 @@ async function refreshLobbyBrowser() {
 // ═══════════════════════════════════════════════════════════════
 (async function boot() {
   // ── Discord Activity: SDK auth runs first, gets user identity directly ──
-  // ── Browser fallback: handles OAuth callback from popup if ?code= present ──
-  tryInitDiscordSdk().catch(() => {});
+  // ── Step 1: await SDK so discordSdk is populated before anything else runs ──
+  // This is critical — without await, discordSdk is null when the user taps Sign In
+  // and the code falls through to the popup/redirect path, triggering the Activity sandbox error.
+  await tryInitDiscordSdk().catch(() => {});
   const hasSupa = initSupabase();
   if (!hasSupa) console.warn('Running without Supabase.');
-  // Handle browser OAuth popup callback (non-Activity only)
+  // ── Step 2: OAuth callback only runs outside Discord Activity ──
   if (!discordSdk) {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('code')) {
