@@ -5377,7 +5377,9 @@ function renderStatsPanel() {
       <div>
         <div style="font-weight:900;font-size:15px;color:#fff;">${dcUser?.username || MY_NAME || 'Guest'}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px;">${dcUser ? '✓ Discord linked' : 'Guest mode'}</div>
+        <div style="font-size:11px;color:#a5b4fc;margin-top:3px;font-weight:800;">Lv.${getLevelFromXP(getTotalXP())} · ${getPlayerTitle(getLevelFromXP(getTotalXP()))}</div>
       </div>
+      <button onclick="openProfileModal()" style="margin-left:auto;background:rgba(129,140,248,.15);border:1px solid rgba(129,140,248,.3);border-radius:10px;padding:6px 11px;font-size:11px;font-weight:800;color:#a5b4fc;cursor:pointer;"><i class="fas fa-id-card"></i> Card</button>
     </div>
     <div class="stats-grid">
       <div class="stat-card highlight">
@@ -6025,7 +6027,675 @@ async function refreshLobbyBrowser() {
   setTimeout(checkShopAffordability, 3000);
   // Start card floaters
   setTimeout(startCardFloaters, 1500);
+  // Init progression
+  setTimeout(initProgression, 2500);
+  // Init daily/weekly challenges
+  setTimeout(checkAndRefreshChallenges, 3000);
 })();
+
+// ═══════════════════════════════════════════════════════════════
+// ██████╗ ██████╗  ██████╗  ██████╗ ██████╗ ███████╗███████╗███████╗██╗ ██████╗ ███╗   ██╗
+// PLAYER PROGRESSION SYSTEM — XP · Levels · Titles · Badges
+// ═══════════════════════════════════════════════════════════════
+const XP_KEY   = 'nixai_xp_v1';
+const PROG_KEY = 'nixai_prog_v1';
+
+// XP thresholds per level (cumulative from 0)
+const XP_PER_LEVEL = [0,100,250,450,700,1000,1400,1900,2500,3200,4000,5000,6200,7600,9200,11000,13200,15600,18400,21600,25000];
+const MAX_LEVEL = XP_PER_LEVEL.length - 1;
+
+const TITLES_BY_LEVEL = {
+  1:'Rookie',2:'Card Toss',3:'Hand Watcher',4:'Stack Player',5:'Wild Caller',
+  6:'Uno Crier',7:'Combo Starter',8:'Draw Dodger',9:'Reverse Master',10:'Skip Lord',
+  11:'Chaos Agent',12:'Card Demon',13:'UNO Veteran',14:'Stack Wizard',15:'Shard Hunter',
+  16:'Neon Shark',17:'Galaxy Brain',18:'Blaze Runner',19:'Echo Protocol',20:'UNO Master',
+};
+const BADGES = [
+  { id:'b_first_win',   icon:'🏆', name:'First Blood',     desc:'Win your first game',          check: (p)=> p.wins >= 1 },
+  { id:'b_streak3',     icon:'🔥', name:'On Fire',         desc:'3 win streak',                 check: (p)=> getWinStreak() >= 3 },
+  { id:'b_streak5',     icon:'💥', name:'Unstoppable',     desc:'5 win streak',                 check: (p)=> getWinStreak() >= 5 },
+  { id:'b_level5',      icon:'⭐', name:'Rising Star',     desc:'Reach Level 5',               check: (p)=> p.level >= 5 },
+  { id:'b_level10',     icon:'🌟', name:'Veteran',         desc:'Reach Level 10',              check: (p)=> p.level >= 10 },
+  { id:'b_level20',     icon:'👑', name:'Legend',          desc:'Reach Level 20',              check: (p)=> p.level >= 20 },
+  { id:'b_shard1000',   icon:'💎', name:'Shard Hoarder',   desc:'Collect 1,000 shards',        check: (p)=> getShards() >= 1000 },
+  { id:'b_shard5000',   icon:'💠', name:'Shard Baron',     desc:'Collect 5,000 shards',        check: (p)=> getShards() >= 5000 },
+  { id:'b_combo4',      icon:'⚡', name:'Quad Stack',      desc:'Play a 4-card combo',         check: (p)=> p.maxCombo >= 4 },
+  { id:'b_win10',       icon:'🎯', name:'Marksman',        desc:'Win 10 games',                check: (p)=> p.wins >= 10 },
+  { id:'b_win50',       icon:'🏅', name:'Hall of Fame',    desc:'Win 50 games',                check: (p)=> p.wins >= 50 },
+  { id:'b_ai_hard',     icon:'🤖', name:'AI Slayer',       desc:'Beat Hard AI',                check: (p)=> p.beatenHardAi >= 1 },
+];
+
+function getProgData() {
+  try { return JSON.parse(localStorage.getItem(PROG_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveProgData(d) { try { localStorage.setItem(PROG_KEY, JSON.stringify(d)); } catch(e) {} }
+function getTotalXP() { try { return parseInt(localStorage.getItem(XP_KEY)||'0',10); } catch(e){return 0;} }
+function saveTotalXP(n) { try { localStorage.setItem(XP_KEY, String(n)); } catch(e){} }
+
+function getLevelFromXP(xp) {
+  for (let i = MAX_LEVEL; i >= 0; i--) {
+    if (xp >= XP_PER_LEVEL[i]) return i;
+  }
+  return 0;
+}
+function getXPForNextLevel(level) {
+  if (level >= MAX_LEVEL) return XP_PER_LEVEL[MAX_LEVEL];
+  return XP_PER_LEVEL[level + 1];
+}
+function getPlayerTitle(level) {
+  return TITLES_BY_LEVEL[level] || TITLES_BY_LEVEL[MAX_LEVEL] || 'UNO Master';
+}
+
+function awardXP(amount, reason) {
+  const prev = getTotalXP();
+  const prevLevel = getLevelFromXP(prev);
+  const newXP = prev + amount;
+  saveTotalXP(newXP);
+  const newLevel = getLevelFromXP(newXP);
+  // Level up notification
+  if (newLevel > prevLevel) {
+    const prog = getProgData();
+    prog.level = newLevel;
+    saveProgData(prog);
+    showLevelUpModal(newLevel);
+    // Bonus shards on level-up
+    const bonusShards = newLevel * 10;
+    addShards(bonusShards, `Level ${newLevel} bonus!`);
+  }
+  // XP float pop
+  showXPPop(amount, reason);
+  checkBadges();
+  updateShardHUDWithLevel();
+}
+
+function showXPPop(xp, reason) {
+  const pop = document.createElement('div');
+  pop.style.cssText = `position:fixed;z-index:500;font-family:'Fredoka One',cursive;font-size:16px;color:#a5b4fc;text-shadow:0 0 14px rgba(165,180,252,.8);pointer-events:none;animation:rewardFloat 1.8s ease forwards;left:${20+Math.random()*30}%;top:40%;`;
+  pop.textContent = `+${xp} XP  ${reason||''}`;
+  document.body.appendChild(pop);
+  setTimeout(()=>pop.remove(),2000);
+}
+
+function showLevelUpModal(level) {
+  const title = getPlayerTitle(level);
+  const mod = document.createElement('div');
+  mod.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);';
+  mod.innerHTML = `
+    <div style="background:linear-gradient(135deg,#1e2040,#161829);border:2px solid rgba(165,180,252,.4);border-radius:24px;padding:32px 28px;text-align:center;max-width:320px;width:90%;animation:cardReveal .5s cubic-bezier(.34,1.56,.64,1) both;box-shadow:0 0 60px rgba(129,140,248,.3);">
+      <div style="font-size:52px;margin-bottom:8px;animation:wildPulse 1.5s ease infinite;">⬆️</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:13px;color:var(--accent2);letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px;">Level Up!</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:40px;background:linear-gradient(135deg,#a5b4fc,#f9c023);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;">Level ${level}</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:20px;color:#fff;margin-bottom:12px;">${title}</div>
+      <div style="font-size:12px;color:var(--muted);font-weight:700;margin-bottom:20px;">+${level*10} 💎 Bonus Shards!</div>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="background:linear-gradient(135deg,#818cf8,#5865F2);border:none;border-radius:12px;padding:10px 28px;font-family:'Fredoka One',cursive;font-size:16px;color:#fff;cursor:pointer;box-shadow:0 4px 16px rgba(88,101,242,.5);">Let's Go! 🎮</button>
+    </div>`;
+  document.body.appendChild(mod);
+  playSound('win');
+  setTimeout(()=>mod.remove(), 8000);
+}
+
+function checkBadges() {
+  const prog = getProgData();
+  prog.badges = prog.badges || [];
+  prog.level = getLevelFromXP(getTotalXP());
+  prog.wins = getLocalHistory().filter(h=>h.result==='win').length;
+  const newBadges = [];
+  for (const badge of BADGES) {
+    if (!prog.badges.includes(badge.id) && badge.check(prog)) {
+      prog.badges.push(badge.id);
+      newBadges.push(badge);
+    }
+  }
+  saveProgData(prog);
+  if (newBadges.length > 0) {
+    setTimeout(() => {
+      newBadges.forEach((b,i) => setTimeout(()=>showBadgeUnlock(b), i*1200));
+    }, 500);
+  }
+}
+
+function showBadgeUnlock(badge) {
+  showToast(`${badge.icon} Badge unlocked: ${badge.name}!`, 'fa-award', 4000);
+}
+
+function initProgression() {
+  const prog = getProgData();
+  if (!prog.level) { prog.level = getLevelFromXP(getTotalXP()); saveProgData(prog); }
+  updateShardHUDWithLevel();
+}
+
+function updateShardHUDWithLevel() {
+  const xp = getTotalXP();
+  const level = getLevelFromXP(xp);
+  const el = document.getElementById('shard-hud');
+  if (!el) return;
+  const existingLevel = el.querySelector('.hud-level-badge');
+  if (existingLevel) existingLevel.remove();
+  const badge = document.createElement('span');
+  badge.className = 'hud-level-badge';
+  badge.style.cssText = 'font-size:10px;font-weight:900;color:#a5b4fc;background:rgba(88,101,242,.2);border-radius:6px;padding:1px 5px;margin-left:2px;letter-spacing:.04em;';
+  badge.textContent = `Lv.${level}`;
+  el.appendChild(badge);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DAILY & WEEKLY CHALLENGES
+// ═══════════════════════════════════════════════════════════════
+const CHALLENGES_KEY = 'nixai_challenges_v1';
+
+const DAILY_POOL = [
+  { id:'dc_play3',     icon:'🃏', text:'Play 3 UNO matches',          goal:3,  key:'gamesPlayed', xp:80,  shards:30  },
+  { id:'dc_win1',      icon:'🏆', text:'Win 1 UNO game',              goal:1,  key:'wins',        xp:120, shards:50  },
+  { id:'dc_special5',  icon:'⚡', text:'Play 5 special cards',        goal:5,  key:'specials',    xp:60,  shards:25  },
+  { id:'dc_combo3',    icon:'🔥', text:'Land a 3+ card combo',        goal:1,  key:'combos',      xp:100, shards:40  },
+  { id:'dc_nodraw',    icon:'🎯', text:'Win without drawing a card',  goal:1,  key:'noDrawWin',   xp:150, shards:70  },
+  { id:'dc_hardai',    icon:'🤖', text:'Beat the Hard AI',            goal:1,  key:'hardAiWin',   xp:200, shards:100 },
+  { id:'dc_shoutuno',  icon:'📢', text:'Shout UNO 3 times',          goal:3,  key:'unoShouts',   xp:50,  shards:20  },
+  { id:'dc_wildcard3', icon:'🌀', text:'Play 3 Wild cards',           goal:3,  key:'wilds',       xp:70,  shards:30  },
+];
+const WEEKLY_POOL = [
+  { id:'wc_win5',      icon:'🏅', text:'Win 5 games this week',       goal:5,  key:'wins',        xp:400, shards:150 },
+  { id:'wc_play10',    icon:'🎮', text:'Play 10 UNO matches',         goal:10, key:'gamesPlayed', xp:300, shards:100 },
+  { id:'wc_combos5',   icon:'💥', text:'Land 5 combos',               goal:5,  key:'combos',      xp:350, shards:120 },
+  { id:'wc_shards500', icon:'💎', text:'Earn 500 shards from wins',   goal:500,key:'shardsWon',   xp:500, shards:200 },
+];
+
+function getChallengeData() {
+  try { return JSON.parse(localStorage.getItem(CHALLENGES_KEY)||'{}'); } catch(e){return {};}
+}
+function saveChallengeData(d) { try { localStorage.setItem(CHALLENGES_KEY, JSON.stringify(d)); }catch(e){} }
+
+function checkAndRefreshChallenges() {
+  let data = getChallengeData();
+  const now = Date.now();
+  const dayMs = 86400000;
+  const weekMs = 7 * dayMs;
+  // Refresh daily
+  if (!data.dailyExpiry || now > data.dailyExpiry) {
+    data.daily = pickChallenges(DAILY_POOL, 3);
+    data.dailyExpiry = now + dayMs;
+    data.dailyProgress = {};
+  }
+  // Refresh weekly
+  if (!data.weeklyExpiry || now > data.weeklyExpiry) {
+    data.weekly = pickChallenges(WEEKLY_POOL, 2);
+    data.weeklyExpiry = now + weekMs;
+    data.weeklyProgress = {};
+  }
+  saveChallengeData(data);
+}
+
+function pickChallenges(pool, n) {
+  const shuffled = [...pool].sort(()=>Math.random()-.5);
+  return shuffled.slice(0, n).map(c => ({ ...c, completed:false }));
+}
+
+function progressChallenge(key, amount=1) {
+  let data = getChallengeData();
+  data.dailyProgress   = data.dailyProgress   || {};
+  data.weeklyProgress  = data.weeklyProgress  || {};
+  // Daily
+  (data.daily||[]).forEach(c => {
+    if (c.completed || c.key !== key) return;
+    data.dailyProgress[c.id] = (data.dailyProgress[c.id]||0) + amount;
+    if (data.dailyProgress[c.id] >= c.goal) {
+      c.completed = true;
+      awardXP(c.xp, `Daily: ${c.text}`);
+      addShards(c.shards, `Daily Challenge!`);
+      showToast(`✅ Daily done: ${c.text}`, 'fa-check-circle', 4000);
+    }
+  });
+  // Weekly
+  (data.weekly||[]).forEach(c => {
+    if (c.completed || c.key !== key) return;
+    data.weeklyProgress[c.id] = (data.weeklyProgress[c.id]||0) + amount;
+    if (data.weeklyProgress[c.id] >= c.goal) {
+      c.completed = true;
+      awardXP(c.xp, `Weekly: ${c.text}`);
+      addShards(c.shards, `Weekly Challenge!`);
+      showToast(`🏅 Weekly done: ${c.text}`, 'fa-crown', 4000);
+    }
+  });
+  saveChallengeData(data);
+}
+
+function openChallengesModal() {
+  let mod = document.getElementById('challenges-modal');
+  if (!mod) {
+    mod = document.createElement('div');
+    mod.id = 'challenges-modal';
+    mod.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:400;align-items:flex-start;justify-content:center;backdrop-filter:blur(10px);overflow-y:auto;padding:24px 12px 60px;';
+    mod.innerHTML = `<div style="background:var(--surface);border:1px solid rgba(129,140,248,.3);border-radius:24px;padding:26px 20px;width:100%;max-width:440px;box-shadow:0 24px 80px rgba(0,0,0,.8);animation:cardReveal .35s cubic-bezier(.34,1.56,.64,1) both;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:#a5b4fc;display:flex;align-items:center;gap:9px;"><i class="fas fa-tasks"></i> Challenges</div>
+        <button onclick="document.getElementById('challenges-modal').style.display='none';" style="background:rgba(255,255,255,.08);border:none;color:#9ca3af;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;"><i class="fas fa-times"></i></button>
+      </div>
+      <div id="challenges-body"></div>
+    </div>`;
+    document.body.appendChild(mod);
+  }
+  mod.style.display = 'flex';
+  renderChallengesBody();
+}
+
+function renderChallengesBody() {
+  checkAndRefreshChallenges();
+  const data = getChallengeData();
+  const body = document.getElementById('challenges-body');
+  if (!body) return;
+  const now = Date.now();
+
+  function msToTime(ms) {
+    const h = Math.floor(ms/3600000);
+    const m = Math.floor((ms%3600000)/60000);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+
+  function renderList(list, progress, label, expiry) {
+    const timeLeft = Math.max(0, expiry - now);
+    return `<div style="font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+      <span>${label}</span><span style="color:var(--timer-warn);"><i class="fas fa-clock" style="font-size:9px;"></i> ${msToTime(timeLeft)}</span>
+    </div>
+    ${(list||[]).map(c => {
+      const prog = progress[c.id]||0;
+      const pct = Math.min(100, Math.round((prog/c.goal)*100));
+      const done = c.completed;
+      return `<div style="background:rgba(255,255,255,.04);border:1px solid ${done?'rgba(34,197,94,.35)':'rgba(255,255,255,.08)'};border-radius:14px;padding:12px 14px;margin-bottom:10px;${done?'opacity:.6;':''}">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <span style="font-size:22px;">${c.icon}</span>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:800;color:${done?'#4ade80':'#fff'};">${done?'✅ ':''}${c.text}</div>
+            <div style="font-size:11px;color:var(--muted);font-weight:700;margin-top:1px;">+${c.xp} XP &nbsp;·&nbsp; +${c.shards} 💎</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,.07);border-radius:20px;height:6px;overflow:hidden;">
+          <div style="background:${done?'#22c55e':'linear-gradient(90deg,#818cf8,#5865F2)'};height:100%;width:${pct}%;border-radius:20px;transition:width .4s ease;"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);font-weight:700;margin-top:4px;text-align:right;">${prog}/${c.goal}</div>
+      </div>`;
+    }).join('')}`;
+  }
+
+  body.innerHTML =
+    renderList(data.daily, data.dailyProgress||{}, '⚡ Daily Challenges', data.dailyExpiry||0) +
+    '<div style="height:18px;"></div>' +
+    renderList(data.weekly, data.weeklyProgress||{}, '📅 Weekly Challenges', data.weeklyExpiry||0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPANDED SHOP — NEW CARD SKINS + TABLE THEMES + EMOTES
+// ═══════════════════════════════════════════════════════════════
+
+// Extend SHOP_ITEMS with more card backs and table themes
+SHOP_ITEMS.cardBacks.push(
+  { id:'cb_crimson', name:'Crimson',  desc:'Deep blood-red luxury back', icon:'🩸', price:180, colors:['#7f0000','#c0392b','#e74c3c','#ff6b6b'] },
+  { id:'cb_ice',     name:'Ice',      desc:'Frosty arctic crystal back',  icon:'🧊', price:180, colors:['#a8edea','#72c8e0','#4a9bc0','#1a6488'] },
+  { id:'cb_forest',  name:'Forest',   desc:'Deep woodland emerald back',  icon:'🌲', price:180, colors:['#1a4731','#2d6a4f','#52b788','#95d5b2'] },
+  { id:'cb_void',    name:'Void',     desc:'Dark matter singularity',     icon:'🌑', price:320, colors:['#0a0a0a','#111','#1a0533','#2d0a6e'] },
+  { id:'cb_aurora',  name:'Aurora',   desc:'Northern lights shimmer',     icon:'🌌', price:400, colors:['#00ff88','#00bcd4','#7c4dff','#e040fb'] },
+  { id:'cb_lava',    name:'Lava',     desc:'Volcanic eruption glow',      icon:'🌋', price:300, colors:['#ff4500','#ff6b35','#ffa500','#ffcc02'] }
+);
+
+// Add table themes to SHOP_ITEMS
+SHOP_ITEMS.tableThemes = [
+  { id:'tt_default',  name:'Dark Space',   desc:'Classic deep space bg',    icon:'🌌', price:0,   bg:'#0d0e1c' },
+  { id:'tt_jungle',   name:'Jungle',       desc:'Deep green jungle vibes',  icon:'🌴', price:200, bg:'linear-gradient(135deg,#0a1a0a,#0d2b0d,#112211)' },
+  { id:'tt_neon_city',name:'Neon City',    desc:'Cyberpunk cityscape',      icon:'🏙️', price:300, bg:'linear-gradient(135deg,#0a001a,#001135,#001a2e)' },
+  { id:'tt_sunset',   name:'Sunset',       desc:'Warm twilight orange sky', icon:'🌅', price:250, bg:'linear-gradient(135deg,#1a0800,#2a1000,#3d1800)' },
+  { id:'tt_arctic',   name:'Arctic',       desc:'Frozen tundra aesthetics', icon:'❄️', price:250, bg:'linear-gradient(135deg,#021a2a,#032035,#041c35)' },
+];
+
+// Add to SHOP_ITEMS.perks
+SHOP_ITEMS.perks.push(
+  { id:'pk_emotes',   name:'Emote Pack',   desc:'Unlock 12 extra in-game reactions', icon:'😂', price:220 },
+  { id:'pk_winfx',    name:'Win Effect',   desc:'Epic confetti+lightning on win',    icon:'🎆', price:350 },
+  { id:'pk_xpboost',  name:'XP Boost',     desc:'2× XP earned for 10 games',         icon:'🚀', price:400, consumable:true },
+);
+
+// Patch renderShopItems to include new sections
+const _origRenderShopItems = renderShopItems;
+function renderShopItems() {
+  _origRenderShopItems();
+  // Add Table Themes section
+  const shopBox = document.querySelector('.shop-box');
+  if (!shopBox) return;
+  // Remove old injected sections
+  shopBox.querySelectorAll('.shop-injected').forEach(e=>e.remove());
+
+  const data = getShopData();
+  const shards = getShards();
+
+  // Table Themes
+  const ttTitle = document.createElement('div');
+  ttTitle.className = 'shop-section-title shop-injected';
+  ttTitle.innerHTML = '<i class="fas fa-palette"></i> Table Themes';
+  ttTitle.style.marginTop = '14px';
+  const ttGrid = document.createElement('div');
+  ttGrid.className = 'shop-grid shop-injected';
+  SHOP_ITEMS.tableThemes.forEach(item => {
+    const owned = item.price === 0 || !!data[item.id];
+    const equipped = (data.equippedTheme||'tt_default') === item.id;
+    const el = document.createElement('div');
+    el.className = 'shop-item' + (owned?' owned':'') + (equipped?' equipped':'');
+    el.innerHTML = `
+      ${equipped?'<span class="shop-item-badge badge-equipped">On</span>':owned?'<span class="shop-item-badge badge-owned">Owned</span>':''}
+      <div class="shop-item-icon">${item.icon}</div>
+      <div class="shop-item-name">${item.name}</div>
+      <div class="shop-item-desc">${item.desc}</div>
+      <div class="shop-item-price">${item.price===0?'Free':'💎 '+item.price}</div>
+      <button class="btn ${equipped?'btn-secondary':owned?'btn-primary':'btn-danger'}" style="margin-top:6px;padding:6px 10px;font-size:11px;width:100%;" onclick="shopThemeAction('${item.id}')">
+        ${equipped?'Active':owned?'Equip':'Buy'}
+      </button>`;
+    ttGrid.appendChild(el);
+  });
+  shopBox.appendChild(ttTitle);
+  shopBox.appendChild(ttGrid);
+}
+
+function shopThemeAction(id) {
+  const data = getShopData();
+  const shards = getShards();
+  const item = SHOP_ITEMS.tableThemes.find(x=>x.id===id);
+  if (!item) return;
+  if (item.price > 0 && !data[id]) {
+    if (shards < item.price) { showToast('Not enough Shards!','fa-times-circle'); return; }
+    const newS = shards - item.price;
+    saveShards(newS);
+    data[id] = true;
+    showToast(`Bought "${item.name}" theme! 💎`,'fa-check-circle');
+  }
+  data.equippedTheme = id;
+  saveShopData(data);
+  applyTableTheme(id);
+  updateShardHUD();
+  renderShopItems();
+  document.getElementById('shop-shard-count').textContent = getShards().toLocaleString();
+}
+
+function applyTableTheme(themeId) {
+  const item = SHOP_ITEMS.tableThemes.find(x=>x.id===(themeId||'tt_default'));
+  if (!item) return;
+  document.body.style.background = item.bg || 'var(--bg)';
+}
+
+function loadEquippedTheme() {
+  const data = getShopData();
+  applyTableTheme(data.equippedTheme || 'tt_default');
+}
+loadEquippedTheme();
+
+// ═══════════════════════════════════════════════════════════════
+// QUICK EMOTES / REACTIONS IN CHAT
+// ═══════════════════════════════════════════════════════════════
+const BASE_EMOTES = ['😂','🔥','😈','🤯','💀','🎉','😤','🤖','🌀','⚡'];
+const BONUS_EMOTES = ['🗿','💅','😎','🫡','🧠','🦾','👑','🎯','😭','🤡'];
+
+function getAvailableEmotes() {
+  const data = getShopData();
+  return data['pk_emotes'] ? [...BASE_EMOTES, ...BONUS_EMOTES] : BASE_EMOTES;
+}
+
+function injectEmoteBar() {
+  if (document.getElementById('emote-bar')) return;
+  const chatPanel = document.getElementById('chat-panel');
+  if (!chatPanel) return;
+  const bar = document.createElement('div');
+  bar.id = 'emote-bar';
+  bar.style.cssText = 'display:flex;gap:5px;flex-wrap:wrap;padding:6px 10px;border-top:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.2);';
+  const emotes = getAvailableEmotes();
+  emotes.forEach(e => {
+    const btn = document.createElement('button');
+    btn.textContent = e;
+    btn.style.cssText = 'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:4px 6px;font-size:16px;cursor:pointer;transition:transform .15s;line-height:1;';
+    btn.onmouseover = ()=>btn.style.transform='scale(1.2)';
+    btn.onmouseout  = ()=>btn.style.transform='scale(1)';
+    btn.onclick = () => sendEmoteReaction(e);
+    bar.appendChild(btn);
+  });
+  // Insert before send row
+  const sendRow = chatPanel.querySelector('#chat-send')?.closest('div');
+  if (sendRow) sendRow.before(bar);
+  else chatPanel.appendChild(bar);
+}
+
+function sendEmoteReaction(emote) {
+  const msg = emote;
+  if (isAiMode) {
+    addChatMessage(MY_ID, msg, false);
+    // Random AI emote response with 30% chance
+    if (Math.random() < 0.3) {
+      const aiId = G?.turnOrder?.find(id=>isAiId(id));
+      if (aiId) {
+        const aiName = G.players[aiId]?.name||'AI';
+        const responses = ['😂','🔥 watch out','💀 rip','🤖 calculating...','👑 too easy'];
+        setTimeout(()=>addChatMessage(aiId, responses[Math.floor(Math.random()*responses.length)], false), 900+Math.random()*800);
+      }
+    }
+  } else {
+    broadcast('chat_msg', { senderId: MY_ID, senderName: MY_NAME, text: msg });
+    addChatMessage(MY_ID, msg, false);
+  }
+}
+
+// Patch initChatPanel to also inject emote bar
+const _origInitChatPanel = initChatPanel;
+function initChatPanel() {
+  _origInitChatPanel();
+  setTimeout(injectEmoteBar, 300);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROFILE CARD UI
+// ═══════════════════════════════════════════════════════════════
+function openProfileModal() {
+  let mod = document.getElementById('profile-modal');
+  if (!mod) {
+    mod = document.createElement('div');
+    mod.id = 'profile-modal';
+    mod.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:400;align-items:flex-start;justify-content:center;backdrop-filter:blur(10px);overflow-y:auto;padding:24px 12px 60px;';
+    mod.innerHTML = `<div style="background:var(--surface);border:1px solid rgba(129,140,248,.3);border-radius:24px;padding:0;width:100%;max-width:400px;overflow:hidden;animation:cardReveal .35s cubic-bezier(.34,1.56,.64,1) both;box-shadow:0 24px 80px rgba(0,0,0,.8);">
+      <div id="profile-card-inner"></div>
+    </div>`;
+    mod.addEventListener('click', e=>{ if(e.target===mod) mod.style.display='none'; });
+    document.body.appendChild(mod);
+  }
+  mod.style.display = 'flex';
+  renderProfileCard();
+}
+
+function renderProfileCard() {
+  const inner = document.getElementById('profile-card-inner');
+  if (!inner) return;
+  const dcUser = getDiscordUser();
+  const xp = getTotalXP();
+  const level = getLevelFromXP(xp);
+  const title = getPlayerTitle(level);
+  const nextLevelXP = getXPForNextLevel(level);
+  const prevLevelXP = XP_PER_LEVEL[level]||0;
+  const pct = level >= MAX_LEVEL ? 100 : Math.round(((xp - prevLevelXP) / (nextLevelXP - prevLevelXP)) * 100);
+  const prog = getProgData();
+  const hist = getLocalHistory();
+  const wins = hist.filter(h=>h.result==='win').length;
+  const total = hist.length;
+  const streak = getWinStreak();
+  const shards = getShards();
+  const badges = (prog.badges||[]).map(id => BADGES.find(b=>b.id===id)).filter(Boolean);
+  const skin = getEquippedSkin();
+  const skinPreview = `<div style="width:38px;height:57px;border-radius:7px;background:linear-gradient(145deg,${skin.colors[0]},${skin.colors[1]},${skin.colors[2]},${skin.colors[3]});border:2px solid rgba(255,255,255,.15);display:inline-flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive;font-size:10px;color:rgba(255,255,255,.8);transform:rotate(-8deg);box-shadow:0 4px 12px rgba(0,0,0,.5);">UNO</div>`;
+
+  const avatarHtml = dcUser?.avatar_url
+    ? `<img src="${dcUser.avatar_url}" style="width:68px;height:68px;border-radius:50%;border:3px solid rgba(129,140,248,.6);object-fit:cover;">`
+    : `<div style="width:68px;height:68px;border-radius:50%;background:linear-gradient(135deg,#5865F2,#818cf8);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:#fff;border:3px solid rgba(129,140,248,.4);">${(MY_NAME||'?').slice(0,1).toUpperCase()}</div>`;
+
+  inner.innerHTML = `
+    <!-- Banner -->
+    <div style="height:80px;background:linear-gradient(135deg,#1a1a3e,#2d1b6e,#1a1a3e);position:relative;overflow:hidden;">
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 60% 50%,rgba(129,140,248,.2),transparent 70%);"></div>
+      <div style="position:absolute;top:10px;right:14px;font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#a78bfa;background:rgba(124,58,237,.25);border:1px solid rgba(124,58,237,.35);border-radius:10px;padding:3px 10px;"><i class="fas fa-star" style="font-size:8px;"></i> ${title}</div>
+      <button onclick="document.getElementById('profile-modal').style.display='none';" style="position:absolute;top:10px;left:12px;background:rgba(0,0,0,.4);border:none;color:#9ca3af;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;"><i class="fas fa-times"></i></button>
+    </div>
+    <!-- Avatar overlap -->
+    <div style="padding:0 20px 20px;margin-top:-36px;">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;">
+        <div style="position:relative;">
+          ${avatarHtml}
+          <div style="position:absolute;bottom:-2px;right:-2px;background:linear-gradient(135deg,#5865F2,#818cf8);border-radius:8px;padding:2px 6px;font-family:'Fredoka One',cursive;font-size:12px;color:#fff;border:2px solid #161829;">${level}</div>
+        </div>
+        ${skinPreview}
+      </div>
+      <div style="font-family:'Fredoka One',cursive;font-size:22px;color:#fff;margin-bottom:2px;">${dcUser?.username?.split('#')[0]||MY_NAME||'Guest'}</div>
+      <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:14px;">${dcUser?'Discord linked ✓':'Guest mode'}</div>
+      <!-- XP bar -->
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:900;color:var(--muted);margin-bottom:5px;letter-spacing:.06em;text-transform:uppercase;"><span>Level ${level}</span><span>${level>=MAX_LEVEL?'MAX':xp.toLocaleString()+' / '+nextLevelXP.toLocaleString()+' XP'}</span></div>
+        <div style="background:rgba(255,255,255,.07);border-radius:20px;height:8px;overflow:hidden;">
+          <div style="background:linear-gradient(90deg,#818cf8,#a5b4fc);height:100%;width:${pct}%;border-radius:20px;transition:width .6s ease;box-shadow:0 0 8px rgba(129,140,248,.5);"></div>
+        </div>
+      </div>
+      <!-- Stats row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+        ${[['🏆','Wins',wins],['🎮','Games',total],['🔥','Streak',streak],['💎','Shards',shards.toLocaleString()]].map(([icon,label,val])=>`
+          <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 6px;text-align:center;">
+            <div style="font-size:18px;margin-bottom:2px;">${icon}</div>
+            <div style="font-family:'Fredoka One',cursive;font-size:15px;color:#fff;">${val}</div>
+            <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.05em;">${label}</div>
+          </div>`).join('')}
+      </div>
+      <!-- Badges -->
+      <div style="font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;"><i class="fas fa-award"></i> Badges (${badges.length}/${BADGES.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        ${BADGES.map(b=>{
+          const earned = (prog.badges||[]).includes(b.id);
+          return `<div title="${b.name}: ${b.desc}" style="background:rgba(255,255,255,${earned?'.08':'.03'});border:1px solid rgba(255,255,255,${earned?'.15':'.06'});border-radius:10px;padding:6px 8px;text-align:center;min-width:44px;opacity:${earned?1:.35};">
+            <div style="font-size:18px;">${b.icon}</div>
+            <div style="font-size:8px;font-weight:800;color:${earned?'#d1d5db':'var(--muted)'};margin-top:2px;max-width:50px;line-height:1.2;">${b.name}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <button onclick="openChallengesModal()" style="margin-top:16px;width:100%;background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.3);border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:#a5b4fc;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;"><i class="fas fa-tasks"></i> View Daily Challenges</button>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HOOK XP / CHALLENGE PROGRESS INTO EXISTING WIN FLOW
+// ═══════════════════════════════════════════════════════════════
+const _origShowWinModal = showWinModal;
+function showWinModal(winnerId) {
+  _origShowWinModal(winnerId);
+  const isMe = winnerId === MY_ID;
+  const prog = getProgData();
+  prog.wins = (prog.wins||0) + (isMe?1:0);
+  // Track AI difficulty wins
+  if (isMe && selectedDifficulty === 'hard') prog.beatenHardAi = (prog.beatenHardAi||0)+1;
+  saveProgData(prog);
+
+  // Award XP
+  if (isMe) {
+    const baseXP = isAiMode ? 30 : 80;
+    const streakBonus = Math.min(getWinStreak(), 5) * 10;
+    awardXP(baseXP + streakBonus, isAiMode ? '🤖 AI Win' : '🏆 Win');
+    progressChallenge('wins', 1);
+    progressChallenge('gamesPlayed', 1);
+    if (selectedDifficulty === 'hard') progressChallenge('hardAiWin', 1);
+    // No-draw win check
+    if (G._noDrawThisGame) progressChallenge('noDrawWin', 1);
+  } else {
+    awardXP(10, 'Participation');
+    progressChallenge('gamesPlayed', 1);
+  }
+
+  // Add XP display to win modal
+  const winModal = document.getElementById('win-modal');
+  if (winModal && isMe) {
+    const existing = winModal.querySelector('.xp-earned-display');
+    if (existing) existing.remove();
+    const xpDiv = document.createElement('div');
+    xpDiv.className = 'xp-earned-display';
+    const baseXP = isAiMode ? 30 : 80;
+    const streakBonus = Math.min(Math.max(getWinStreak()-1,0), 5) * 10;
+    xpDiv.style.cssText = 'background:rgba(129,140,248,.1);border:1px solid rgba(129,140,248,.25);border-radius:12px;padding:8px 16px;margin:6px 0;font-family:"Fredoka One",cursive;font-size:16px;color:#a5b4fc;text-align:center;';
+    xpDiv.innerHTML = `⬆️ +${baseXP + streakBonus} XP  (Lv.${getLevelFromXP(getTotalXP())})`;
+    const shardDiv = document.getElementById('win-shards-earned');
+    if (shardDiv) shardDiv.after(xpDiv);
+  }
+}
+
+// Track no-draw wins and special/wild plays
+const _origProcessAction = processAction;
+function processAction(action) {
+  _origProcessAction(action);
+  if (!G) return;
+  // Track specials played
+  if (action.type === 'play_card' && action.playerId === MY_ID && action.cards) {
+    const cards = Array.isArray(action.cards) ? action.cards : [action.cards];
+    const specials = cards.filter(c=>['skip','reverse','draw2','wild4'].includes(c.value));
+    const wilds = cards.filter(c=>c.color==='black');
+    if (specials.length > 0) progressChallenge('specials', specials.length);
+    if (wilds.length > 0) progressChallenge('wilds', wilds.length);
+    // Combo tracking
+    if (cards.length >= 3) {
+      const prog = getProgData();
+      prog.maxCombo = Math.max(prog.maxCombo||0, cards.length);
+      saveProgData(prog);
+      progressChallenge('combos', 1);
+    }
+  }
+}
+
+const _origShoutUno = shoutUno;
+function shoutUno() {
+  _origShoutUno();
+  progressChallenge('unoShouts', 1);
+}
+
+// Track shards won
+const _origAddShards = addShards;
+function addShards(n, label) {
+  _origAddShards(n, label);
+  if (label && (label.includes('Win') || label.includes('win') || label.includes('Combo') || label.includes('combo'))) {
+    progressChallenge('shardsWon', n);
+  }
+}
+
+// Initialize no-draw tracking per game
+const _origInitGameState = initGameState;
+function initGameState(playerIds) {
+  _origInitGameState(playerIds);
+  if (G) G._noDrawThisGame = true;
+  G._drawCount = G._drawCount || 0;
+}
+
+const _origDrawCardAction = drawCardAction;
+function drawCardAction() {
+  if (G && isMyTurn()) {
+    G._noDrawThisGame = false;
+    G._drawCount = (G._drawCount||0)+1;
+  }
+  _origDrawCardAction();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LAUNCHER BUTTONS — Challenges + Profile shortcuts
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const qRow = document.querySelector('#screen-launcher div[style*="gap:8px;justify-content:center"]');
+  if (qRow) {
+    const challengeBtn = document.createElement('button');
+    challengeBtn.className = 'btn';
+    challengeBtn.style.cssText = 'background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.25);color:#a5b4fc;font-size:12px;padding:7px 14px;';
+    challengeBtn.innerHTML = '<i class="fas fa-tasks"></i> Challenges';
+    challengeBtn.onclick = openChallengesModal;
+
+    const profileBtn = document.createElement('button');
+    profileBtn.className = 'btn';
+    profileBtn.style.cssText = 'background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.25);color:#a5b4fc;font-size:12px;padding:7px 14px;';
+    profileBtn.innerHTML = '<i class="fas fa-user-circle"></i> Profile';
+    profileBtn.onclick = openProfileModal;
+
+    qRow.appendChild(challengeBtn);
+    qRow.appendChild(profileBtn);
+  }
+});
 </script>
 </body>
 </html>
